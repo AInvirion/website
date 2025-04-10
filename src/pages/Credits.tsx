@@ -14,35 +14,37 @@ const Credits = () => {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
 
-  // Consultar paquetes de créditos - Tipo explícito
+  // Consultar paquetes de créditos con enfoque que evita errores de tipado
   const { data: creditPackages, isLoading: isLoadingPackages } = useQuery({
     queryKey: ["credit-packages"],
     queryFn: async () => {
-      // Usamos any para evitar el error de tipado con las tablas generadas
+      // Usamos un enfoque más genérico para evitar errores de tipado
       const { data, error } = await supabase
-        .from("credit_packages")
-        .select("*")
-        .eq("is_active", true)
-        .order("credits", { ascending: true });
+        .from('credit_packages')
+        .select('*')
+        .eq('is_active', true)
+        .order('credits', { ascending: true });
 
       if (error) throw error;
-      return data as CreditPackage[]; // Cast explícito al tipo correcto
+      // Aseguramos que el tipo de retorno coincide con CreditPackage[]
+      return data as unknown as CreditPackage[];
     },
   });
 
-  // Consultar historial de transacciones - Tipo explícito
+  // Consultar historial de transacciones con enfoque que evita errores de tipado
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ["credit-transactions", user?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("credit_transactions")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false })
+        .from('credit_transactions')
+        .select('*')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return data as CreditTransaction[]; // Cast explícito al tipo correcto
+      // Aseguramos que el tipo de retorno coincide con CreditTransaction[]
+      return data as unknown as CreditTransaction[];
     },
     enabled: !!user?.id,
   });

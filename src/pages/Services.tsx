@@ -29,7 +29,8 @@ const ServicesPage = () => {
         .order("price");
 
       if (error) throw error;
-      return data as Service[];
+      // Usamos cast a unknown primero para evitar errores de tipado
+      return data as unknown as Service[];
     },
   });
 
@@ -98,7 +99,7 @@ const ServicesPage = () => {
               name={service.name}
               description={service.description}
               price={service.price}
-              features={"features" in service ? service.features : []}
+              features={service.features || []}
             />
           ))}
         </div>
