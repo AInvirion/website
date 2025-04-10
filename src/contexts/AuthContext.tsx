@@ -4,7 +4,7 @@ import { Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthState, AppRole, UserWithRole } from "@/types/auth";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/sonner";
+import { toast } from "sonner";
 
 interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<void>;
@@ -23,22 +23,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAuthenticated: false,
   });
 
-  // Función para cargar los roles del usuario
-  const fetchUserRoles = async (userId: string) => {
+  // Función para cargar los roles del usuario usando la función has_role
+  const fetchUserRoles = async (userId: string): Promise<AppRole[]> => {
     try {
-      const { data: roles, error } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", userId);
+      // Verificamos primero el rol de usuario
+      const { data: isUserRole, error: userError } = await supabase
+        .rpc('has_role', { _user_id: userId, _role: 'usuario' });
 
-      if (error) {
-        console.error("Error fetching user roles:", error);
+      // Verificamos el rol de admin
+      const { data: isAdminRole, error: adminError } = await supabase
+        .rpc('has_role', { _user_id: userId, _role: 'admin' });
+
+      if (userError || adminError) {
+        console.error("Error verificando roles:", userError || adminError);
         return [];
       }
 
-      return roles.map((r) => r.role) as AppRole[];
+      const roles: AppRole[] = [];
+      if (isUserRole) roles.push('usuario');
+      if (isAdminRole) roles.push('admin');
+      
+      return roles;
     } catch (error) {
-      console.error("Error fetching user roles:", error);
+      console.error("Error al obtener roles:", error);
       return [];
     }
   };
@@ -46,20 +53,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   // Función para cargar los detalles del perfil del usuario
   const fetchUserProfile = async (userId: string) => {
     try {
-      const { data: profile, error } = await supabase
-        .from("profiles")
-        .select("*")
-        .eq("id", userId)
-        .single();
+      // Usamos solo el ID para obtener el perfil
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
 
       if (error) {
-        console.error("Error fetching user profile:", error);
+        console.error("Error al obtener perfil:", error);
         return null;
       }
 
-      return profile;
+      return data;
     } catch (error) {
-      console.error("Error fetching user profile:", error);
+      console.error("Error al obtener perfil:", error);
       return null;
     }
   };
@@ -144,11 +152,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
       if (error) {
         console.error("Error signing in with Google:", error);
-        toast.error("Error al iniciar sesión con Google");
+        toast("Error al iniciar sesión con Google", {
+          description: error.message,
+          className: "bg-red-500"
+        });
       }
     } catch (error) {
       console.error("Error signing in with Google:", error);
-      toast.error("Error al iniciar sesión con Google");
+      toast("Error al iniciar sesión con Google", {
+        className: "bg-red-500"
+      });
     }
   };
 
@@ -157,10 +170,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       await supabase.auth.signOut();
       navigate("/");
-      toast.success("Has cerrado sesión correctamente");
+      toast("Sesión cerrada", {
+        description: "Has cerrado sesión correctamente",
+        className: "bg-green-500"
+      });
     } catch (error) {
       console.error("Error signing out:", error);
-      toast.error("Error al cerrar sesión");
+      toast("Error al cerrar sesión", {
+        className: "bg-red-500"
+      });
     }
   };
 
