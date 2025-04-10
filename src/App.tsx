@@ -12,6 +12,10 @@ import Unauthorized from "./pages/Unauthorized";
 import { AuthProvider } from "./contexts/AuthContext";
 import { DashboardLayout } from "./components/DashboardLayout";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import Credits from "./pages/Credits";
+import Services from "./pages/Services";
+import ServicePayment from "./pages/ServicePayment";
+import PaymentSuccess from "./pages/PaymentSuccess";
 
 const queryClient = new QueryClient();
 
@@ -31,9 +35,12 @@ const App = () => (
             <Route element={<ProtectedRoute />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
-                <Route path="/dashboard/servicios" element={<div>Servicios</div>} />
+                <Route path="/dashboard/servicios" element={<Services />} />
+                <Route path="/dashboard/servicios/:serviceId/pagar" element={<ServicePayment />} />
+                <Route path="/dashboard/servicios/success" element={<PaymentSuccess />} />
                 <Route path="/dashboard/historial" element={<div>Historial</div>} />
-                <Route path="/dashboard/creditos" element={<div>Créditos</div>} />
+                <Route path="/dashboard/creditos" element={<Credits />} />
+                <Route path="/dashboard/creditos/success" element={<PaymentSuccess />} />
                 
                 {/* Rutas de administración - Solo administradores */}
                 <Route element={<ProtectedRoute requiredRoles={["admin"]} redirectTo="/unauthorized" />}>
