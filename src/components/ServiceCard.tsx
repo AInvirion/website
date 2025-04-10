@@ -10,7 +10,7 @@ interface ServiceCardProps {
   name: string;
   description: string;
   price: number;
-  features?: string[];
+  features: string[];
 }
 
 export const ServiceCard = ({ id, name, description, price, features = [] }: ServiceCardProps) => {

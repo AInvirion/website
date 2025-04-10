@@ -12,6 +12,7 @@ interface Service {
   name: string;
   description: string;
   price: number;
+  features?: string[];
 }
 
 const ServicesPage = () => {
@@ -97,7 +98,7 @@ const ServicesPage = () => {
               name={service.name}
               description={service.description}
               price={service.price}
-              features={"features" in service ? service.features : undefined}
+              features={"features" in service ? service.features : []}
             />
           ))}
         </div>

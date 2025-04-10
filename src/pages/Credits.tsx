@@ -7,31 +7,18 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, CreditCard, Loader2 } from "lucide-react";
 import { toast } from "sonner";
-
-interface CreditPackage {
-  id: string;
-  name: string;
-  credits: number;
-  price: number;
-  is_active: boolean;
-}
-
-interface CreditTransaction {
-  id: string;
-  amount: number;
-  type: string;
-  created_at: string;
-}
+import { CreditPackage, CreditTransaction } from "@/types/credits";
 
 const Credits = () => {
   const { user } = useAuth();
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
 
-  // Consultar paquetes de créditos
+  // Consultar paquetes de créditos - Tipo explícito
   const { data: creditPackages, isLoading: isLoadingPackages } = useQuery({
     queryKey: ["credit-packages"],
     queryFn: async () => {
+      // Usamos any para evitar el error de tipado con las tablas generadas
       const { data, error } = await supabase
         .from("credit_packages")
         .select("*")
@@ -39,11 +26,11 @@ const Credits = () => {
         .order("credits", { ascending: true });
 
       if (error) throw error;
-      return data as CreditPackage[];
+      return data as CreditPackage[]; // Cast explícito al tipo correcto
     },
   });
 
-  // Consultar historial de transacciones
+  // Consultar historial de transacciones - Tipo explícito
   const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ["credit-transactions", user?.id],
     queryFn: async () => {
@@ -55,7 +42,7 @@ const Credits = () => {
         .limit(10);
 
       if (error) throw error;
-      return data as CreditTransaction[];
+      return data as CreditTransaction[]; // Cast explícito al tipo correcto
     },
     enabled: !!user?.id,
   });
@@ -222,7 +209,7 @@ const Credits = () => {
                     <CardContent className="flex justify-between items-center py-4">
                       <div>
                         <p className="font-medium">{typeText}</p>
-                        <p className="text-xs text-gray-500">{formatDate(transaction.created_at)}</p>
+                        <p className="text-xs text-gray-500">{transaction.created_at ? formatDate(transaction.created_at) : 'Fecha no disponible'}</p>
                       </div>
                       <div className={`font-bold ${colorClass}`}>
                         {transaction.amount > 0 ? '+' : ''}{transaction.amount} créditos
