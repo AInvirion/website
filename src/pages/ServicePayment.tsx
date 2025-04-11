@@ -67,7 +67,7 @@ const ServicePayment = () => {
         .from("credit_transactions")
         .insert({
           user_id: user.id,
-          amount: -service.price, // Negativo para indicar consumo
+          amount: service.price, // Monto positivo, el tipo indica que es un gasto
           type: "service_payment",
           reference_id: service.id,
         });
@@ -115,6 +115,9 @@ const ServicePayment = () => {
     try {
       const origin = window.location.origin;
 
+      console.log("Iniciando pago con Stripe para servicio:", service.id);
+      console.log("URL de origen:", origin);
+
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
           checkoutType: "service",
@@ -123,18 +126,23 @@ const ServicePayment = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error al invocar la función create-checkout:", error);
+        throw error;
+      }
 
       // Redirigir a la URL de checkout de Stripe
       if (data?.url) {
+        console.log("Redirigiendo a URL de Stripe:", data.url);
         window.location.href = data.url;
       } else {
+        console.error("No se recibió URL de checkout en la respuesta:", data);
         throw new Error("No se pudo crear la sesión de pago");
       }
     } catch (error) {
       console.error("Error al iniciar el proceso de pago:", error);
       toast("Error al procesar el pago", {
-        description: "Intenta nuevamente más tarde",
+        description: "Intenta nuevamente más tarde o contacta a soporte",
         className: "bg-red-500"
       });
     } finally {
@@ -285,6 +293,6 @@ const ServicePayment = () => {
       </Card>
     </div>
   );
-};
+}
 
 export default ServicePayment;

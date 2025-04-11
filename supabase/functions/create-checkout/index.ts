@@ -3,9 +3,11 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
+// Definir encabezados CORS que permitan solicitudes desde cualquier origen
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
 // Función para verificar una sesión de Stripe y crear una transacción manual si es necesario
@@ -114,13 +116,24 @@ async function verifyStripeSession(stripe, sessionId, userId, supabaseAdmin) {
 }
 
 serve(async (req) => {
-  // This is needed if you're planning to invoke your function from a browser.
+  // Manejar las solicitudes preflight OPTIONS para CORS
   if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+    return new Response(null, {
+      status: 204,
+      headers: corsHeaders
+    });
   }
 
   try {
-    const { action, sessionId, userId, packageId, serviceId, price, origin, checkoutType } = await req.json();
+    // Obtener el cuerpo de la solicitud
+    const requestData = await req.json().catch(e => {
+      console.error("Error al parsear el cuerpo de la solicitud:", e);
+      throw new Error("Formato de solicitud inválido");
+    });
+    
+    const { action, sessionId, userId, packageId, serviceId, price, origin, checkoutType } = requestData;
+
+    console.log("Datos recibidos:", { action, sessionId, packageId, serviceId, origin, checkoutType });
 
     // Get secret keys from Supabase
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -166,6 +179,7 @@ serve(async (req) => {
         const { data: { user }, error } = await supabaseAdmin.auth.getUser(jwt);
         
         if (error || !user) {
+          console.error("Error al verificar JWT:", error);
           throw new Error("Usuario no autenticado");
         }
         
@@ -176,6 +190,7 @@ serve(async (req) => {
         throw new Error("Error de autenticación");
       }
     } else {
+      console.error("No se proporcionó token de autenticación");
       throw new Error("No se proporcionó token de autenticación");
     }
 

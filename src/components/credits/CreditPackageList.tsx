@@ -68,7 +68,7 @@ export function CreditPackageList() {
     } catch (error) {
       console.error("Error detallado al iniciar el proceso de compra:", error);
       toast("Error al procesar la compra", {
-        description: "Intenta nuevamente más tarde",
+        description: "Intenta nuevamente más tarde o contacta a soporte",
         className: "bg-red-500"
       });
     } finally {
