@@ -48,15 +48,11 @@ serve(async (req) => {
       });
     }
 
-    const body = await req.text();
-    console.log("INFO: Received webhook with payload size:", body.length);
-    console.log("INFO: Signature:", signature.substring(0, 20) + "...");
-    
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    const supabaseServiceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
     
-    if (!supabaseUrl || !supabaseAnonKey) {
+    if (!supabaseUrl || !supabaseServiceRoleKey) {
       console.error("ERROR: Supabase credentials missing");
       return new Response(JSON.stringify({ error: "Supabase configuration missing" }), { 
         status: 500,
@@ -64,16 +60,20 @@ serve(async (req) => {
       });
     }
     
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
+    // Es importante usar el SERVICE_ROLE_KEY para bypasear RLS
+    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+
+    const body = await req.text();
+    console.log("INFO: Received webhook with payload size:", body.length);
+    console.log("INFO: Signature:", signature.substring(0, 20) + "...");
     
     let event;
     
-    // Verify webhook signature
+    // IMPORTANTE: Usar la versión asíncrona de constructEvent
     try {
       console.log("INFO: Verifying webhook signature with secret:", 
         endpointSecret.substring(0, 10) + "...");
       
-      // Usar la versión asíncrona de constructEvent
       event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
@@ -101,19 +101,19 @@ serve(async (req) => {
     // Handle different event types
     switch (event.type) {
       case "checkout.session.completed":
-        await handleCheckoutSessionCompleted(session, supabaseClient);
+        await handleCheckoutSessionCompleted(session, supabaseAdmin);
         break;
         
       case "checkout.session.async_payment_succeeded":
-        await handleAsyncPaymentSucceeded(session, supabaseClient);
+        await handleAsyncPaymentSucceeded(session, supabaseAdmin);
         break;
         
       case "checkout.session.async_payment_failed":
-        await handleAsyncPaymentFailed(session, supabaseClient);
+        await handleAsyncPaymentFailed(session, supabaseAdmin);
         break;
         
       case "checkout.session.expired":
-        await handleCheckoutSessionExpired(session, supabaseClient);
+        await handleCheckoutSessionExpired(session, supabaseAdmin);
         break;
         
       default:
@@ -155,7 +155,7 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
       if (credits > 0) {
         console.log(`INFO: Adding ${credits} credits for user ${userId}`);
         
-        // Register the credit transaction
+        // Register the credit transaction (usando SERVICE ROLE para bypasear RLS)
         const { data: transactionData, error: transactionError } = await supabaseClient
           .from("credit_transactions")
           .insert({
@@ -174,7 +174,7 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
         
         console.log(`SUCCESS: Transaction registered: ${transactionData?.[0]?.id || 'unknown ID'}`);
         
-        // Verificar el saldo actual del usuario para diagnóstico
+        // Actualizar manualmente los créditos del usuario (usando SERVICE ROLE para bypasear RLS)
         const { data: userData, error: userError } = await supabaseClient
           .from("profiles")
           .select("credits")
@@ -185,37 +185,17 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
           console.error(`ERROR: Error checking user credits: ${userError.message}`);
         } else {
           console.log(`INFO: User credits before update: ${userData?.credits || 0}`);
-        }
-        
-        // El gatillo de base de datos update_user_credits debe actualizar los créditos automáticamente
-        // cuando se inserta la transacción. Si no está funcionando, verificamos aquí.
-        
-        // Verificar nuevamente el saldo después de la transacción
-        const { data: updatedUserData, error: updatedUserError } = await supabaseClient
-          .from("profiles")
-          .select("credits")
-          .eq("id", userId)
-          .single();
-        
-        if (updatedUserError) {
-          console.error(`ERROR: Error checking updated user credits: ${updatedUserError.message}`);
-        } else {
-          console.log(`INFO: User credits after update: ${updatedUserData?.credits || 0}`);
           
-          // Si los créditos no se actualizaron, intentamos actualizarlos manualmente
-          if (updatedUserData?.credits === userData?.credits) {
-            console.log(`WARNING: Credits not updated by trigger, updating manually`);
-            
-            const { error: updateError } = await supabaseClient
-              .from("profiles")
-              .update({ credits: (userData?.credits || 0) + credits })
-              .eq("id", userId);
-            
-            if (updateError) {
-              console.error(`ERROR: Error updating credits manually: ${updateError.message}`);
-            } else {
-              console.log(`SUCCESS: Credits updated manually: ${credits} added to user ${userId}`);
-            }
+          // Actualizar los créditos manualmente
+          const { error: updateError } = await supabaseClient
+            .from("profiles")
+            .update({ credits: (userData?.credits || 0) + credits })
+            .eq("id", userId);
+          
+          if (updateError) {
+            console.error(`ERROR: Error updating credits manually: ${updateError.message}`);
+          } else {
+            console.log(`SUCCESS: Credits updated manually: ${credits} added to user ${userId}`);
           }
         }
       }
