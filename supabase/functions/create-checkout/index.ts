@@ -3,14 +3,14 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
 
-// Definir encabezados CORS que permitan solicitudes desde cualquier origen
+// Define CORS headers to allow requests from any origin
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-// Función para verificar una sesión de Stripe y crear una transacción manual si es necesario
+// Function to verify a Stripe session and create a manual transaction if necessary
 async function verifyStripeSession(stripe, sessionId, userId, supabaseAdmin) {
   try {
     console.log(`Verificando sesión: ${sessionId} para usuario: ${userId}`);
@@ -116,7 +116,7 @@ async function verifyStripeSession(stripe, sessionId, userId, supabaseAdmin) {
 }
 
 serve(async (req) => {
-  // Manejar las solicitudes preflight OPTIONS para CORS
+  // Handle preflight OPTIONS requests for CORS
   if (req.method === "OPTIONS") {
     return new Response(null, {
       status: 204,
@@ -125,15 +125,15 @@ serve(async (req) => {
   }
 
   try {
-    // Obtener el cuerpo de la solicitud
+    // Obtain the request body
     const requestData = await req.json().catch(e => {
-      console.error("Error al parsear el cuerpo de la solicitud:", e);
-      throw new Error("Formato de solicitud inválido");
+      console.error("Error parsing request body:", e);
+      throw new Error("Invalid request format");
     });
     
     const { action, sessionId, userId, packageId, serviceId, price, origin, checkoutType } = requestData;
 
-    console.log("Datos recibidos:", { action, sessionId, packageId, serviceId, origin, checkoutType });
+    console.log("Received data:", { action, sessionId, packageId, serviceId, origin, checkoutType });
 
     // Get secret keys from Supabase
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -156,7 +156,7 @@ serve(async (req) => {
     // Initialize Supabase with SERVICE_ROLE key to bypass RLS
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
 
-    // Verificar y recuperar sesión si es necesario
+    // Verify and recover session if necessary
     if (action === "verify_session" && sessionId && userId) {
       const result = await verifyStripeSession(stripe, sessionId, userId, supabaseAdmin);
       
@@ -169,7 +169,7 @@ serve(async (req) => {
       );
     }
 
-    // Extraer JWT del encabezado de autorización
+    // Extract JWT from authorization header
     const authHeader = req.headers.get('authorization');
     let userId;
 
@@ -179,26 +179,26 @@ serve(async (req) => {
         const { data: { user }, error } = await supabaseAdmin.auth.getUser(jwt);
         
         if (error || !user) {
-          console.error("Error al verificar JWT:", error);
-          throw new Error("Usuario no autenticado");
+          console.error("Error verifying JWT:", error);
+          throw new Error("User not authenticated");
         }
         
         userId = user.id;
-        console.log("Usuario autenticado:", userId);
+        console.log("Authenticated user:", userId);
       } catch (error) {
-        console.error("Error al verificar JWT:", error);
-        throw new Error("Error de autenticación");
+        console.error("Error verifying JWT:", error);
+        throw new Error("Authentication error");
       }
     } else {
-      console.error("No se proporcionó token de autenticación");
-      throw new Error("No se proporcionó token de autenticación");
+      console.error("No authentication token provided");
+      throw new Error("No authentication token provided");
     }
 
-    // Crear sesión de checkout según el tipo
+    // Create checkout session based on type
     if (checkoutType === "package" && packageId) {
-      console.log(`Creando sesión de checkout para paquete: ${packageId}`);
+      console.log(`Creating checkout session for package: ${packageId}`);
       
-      // Obtener información del paquete
+      // Get package information
       const { data: packageData, error: packageError } = await supabaseAdmin
         .from("credit_packages")
         .select("*")
@@ -206,13 +206,13 @@ serve(async (req) => {
         .single();
       
       if (packageError || !packageData) {
-        console.error("Error al obtener el paquete:", packageError);
-        throw new Error("No se pudo obtener información del paquete");
+        console.error("Error getting package:", packageError);
+        throw new Error("Could not get package information");
       }
       
-      console.log("Paquete encontrado:", packageData);
+      console.log("Package found:", packageData);
       
-      // Crear sesión de checkout
+      // Create checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
@@ -221,9 +221,9 @@ serve(async (req) => {
               currency: "usd",
               product_data: {
                 name: packageData.name,
-                description: `${packageData.credits} créditos`,
+                description: `${packageData.credits} credits`,
               },
-              unit_amount: packageData.price,  // Precio en centavos
+              unit_amount: packageData.price,  // Price in cents
             },
             quantity: 1,
           },
@@ -238,7 +238,7 @@ serve(async (req) => {
         },
       });
       
-      console.log("Sesión de checkout creada:", session.id);
+      console.log("Checkout session created:", session.id);
       
       return new Response(
         JSON.stringify({ url: session.url }),
@@ -249,9 +249,9 @@ serve(async (req) => {
       );
     } 
     else if (checkoutType === "service" && serviceId) {
-      console.log(`Creando sesión de checkout para servicio: ${serviceId}`);
+      console.log(`Creating checkout session for service: ${serviceId}`);
       
-      // Obtener información del servicio
+      // Get service information
       const { data: serviceData, error: serviceError } = await supabaseAdmin
         .from("services")
         .select("*")
@@ -259,16 +259,16 @@ serve(async (req) => {
         .single();
       
       if (serviceError || !serviceData) {
-        console.error("Error al obtener el servicio:", serviceError);
-        throw new Error("No se pudo obtener información del servicio");
+        console.error("Error getting service:", serviceError);
+        throw new Error("Could not get service information");
       }
       
-      console.log("Servicio encontrado:", serviceData);
+      console.log("Service found:", serviceData);
       
-      // Convertir precio de créditos a dólares (4 dólares por crédito)
-      const priceInCents = serviceData.price * 400;  // $4.00 = 400 centavos por crédito
+      // Convert credit price to dollars (4 dollars per credit)
+      const priceInCents = serviceData.price * 400;  // $4.00 = 400 cents per credit
       
-      // Crear sesión de checkout
+      // Create checkout session
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ["card"],
         line_items: [
@@ -277,7 +277,7 @@ serve(async (req) => {
               currency: "usd",
               product_data: {
                 name: serviceData.name,
-                description: serviceData.description || "Servicio premium",
+                description: serviceData.description || "Premium service",
               },
               unit_amount: priceInCents,
             },
@@ -294,7 +294,7 @@ serve(async (req) => {
         },
       });
       
-      console.log("Sesión de checkout creada:", session.id);
+      console.log("Checkout session created:", session.id);
       
       return new Response(
         JSON.stringify({ url: session.url }),
@@ -306,7 +306,7 @@ serve(async (req) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "Tipo de checkout no soportado o datos incompletos" }),
+      JSON.stringify({ error: "Unsupported checkout type or incomplete data" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,

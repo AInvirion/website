@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -12,7 +11,6 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
   const [paymentMethod, setPaymentMethod] = useState<"credits" | "stripe">("credits");
   const navigate = useNavigate();
 
-  // Obtener datos del servicio
   const { data: service, isLoading } = useQuery({
     queryKey: ["service", serviceId],
     queryFn: async () => {
@@ -30,12 +28,10 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
     enabled: !!serviceId,
   });
 
-  // Verificar si el usuario tiene suficientes créditos
   const hasSufficientCredits = user?.credits && service?.price 
     ? user.credits >= service.price
     : false;
 
-  // Manejar pago con créditos
   const handleCreditPayment = async () => {
     if (!service || !user?.id) return;
     
@@ -50,19 +46,17 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
     setIsProcessing(true);
     
     try {
-      // Registrar transacción de créditos
       const { error: transactionError } = await supabase
         .from("credit_transactions")
         .insert({
           user_id: user.id,
-          amount: service.price, // Monto positivo, el tipo indica que es un gasto
+          amount: service.price,
           type: "service_payment",
           reference_id: service.id,
         });
 
       if (transactionError) throw transactionError;
 
-      // Registrar la ejecución del servicio
       const { error: executionError } = await supabase
         .from("service_executions")
         .insert({
@@ -74,13 +68,11 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
 
       if (executionError) throw executionError;
 
-      // Mostrar mensaje de éxito
       toast("Pago con créditos completado", {
         description: `Has utilizado ${service.price} créditos para este servicio`,
         className: "bg-green-500"
       });
 
-      // Redirigir al usuario
       navigate("/dashboard/historial");
       
     } catch (error) {
@@ -94,7 +86,6 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
     }
   };
 
-  // Manejar pago con Stripe
   const handleStripePayment = async () => {
     if (!service || !user?.id) return;
     
@@ -103,8 +94,8 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
     try {
       const origin = window.location.origin;
 
-      console.log("Iniciando pago con Stripe para servicio:", service.id);
-      console.log("URL de origen:", origin);
+      console.log("Starting Stripe payment for service:", service.id);
+      console.log("Origin URL:", origin);
 
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
@@ -115,22 +106,21 @@ export function useServicePayment(serviceId: string | undefined, user: UserWithR
       });
 
       if (error) {
-        console.error("Error al invocar la función create-checkout:", error);
+        console.error("Error invoking create-checkout function:", error);
         throw error;
       }
 
-      // Redirigir a la URL de checkout de Stripe
       if (data?.url) {
-        console.log("Redirigiendo a URL de Stripe:", data.url);
+        console.log("Redirecting to Stripe URL:", data.url);
         window.location.href = data.url;
       } else {
-        console.error("No se recibió URL de checkout en la respuesta:", data);
-        throw new Error("No se pudo crear la sesión de pago");
+        console.error("No checkout URL received in response:", data);
+        throw new Error("Could not create payment session");
       }
     } catch (error) {
-      console.error("Error al iniciar el proceso de pago:", error);
-      toast("Error al procesar el pago", {
-        description: "Intenta nuevamente más tarde o contacta a soporte",
+      console.error("Error starting payment process:", error);
+      toast("Error processing payment", {
+        description: "Please try again later or contact support",
         className: "bg-red-500"
       });
     } finally {
