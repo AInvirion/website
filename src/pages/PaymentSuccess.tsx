@@ -19,6 +19,7 @@ const PaymentSuccess = () => {
   const [retries, setRetries] = useState(0);
   const [transactionFound, setTransactionFound] = useState(false);
   const [manualRefreshCount, setManualRefreshCount] = useState(0);
+  const [isManualRecoveryInProgress, setIsManualRecoveryInProgress] = useState(false);
 
   // Verify the payment status
   const verifyPayment = async () => {
@@ -107,6 +108,7 @@ const PaymentSuccess = () => {
       return;
     }
 
+    setIsManualRecoveryInProgress(true);
     toast.loading("Intentando recuperar el pago...");
 
     try {
@@ -129,12 +131,16 @@ const PaymentSuccess = () => {
         toast.success("¡Pago verificado correctamente!");
         await refreshUserData();
         refetch();
+      } else if (data?.message) {
+        toast.error(data.message);
       } else {
         toast.error("No se pudo verificar el pago automáticamente");
       }
     } catch (error) {
       console.error("Error en la recuperación manual:", error);
       toast.error("Error en el proceso de recuperación");
+    } finally {
+      setIsManualRecoveryInProgress(false);
     }
   };
 
@@ -226,9 +232,22 @@ const PaymentSuccess = () => {
                   <RefreshCw className="h-4 w-4" />
                   Actualizar datos
                 </Button>
-                {retries > 3 && (
-                  <Button variant="secondary" size="sm" onClick={handleManualRecovery} className="flex items-center gap-2">
-                    Intentar recuperación manual
+                {retries > 2 && (
+                  <Button 
+                    variant="secondary" 
+                    size="sm" 
+                    onClick={handleManualRecovery} 
+                    disabled={isManualRecoveryInProgress}
+                    className="flex items-center gap-2"
+                  >
+                    {isManualRecoveryInProgress ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                        Procesando...
+                      </>
+                    ) : (
+                      "Intentar recuperación manual"
+                    )}
                   </Button>
                 )}
               </div>

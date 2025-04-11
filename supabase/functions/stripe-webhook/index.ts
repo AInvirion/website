@@ -68,12 +68,13 @@ serve(async (req) => {
     
     let event;
     
-    // Verify webhook signature
+    // Verify webhook signature - CAMBIO CRUCIAL: usar constructEventAsync en lugar de constructEvent
     try {
       console.log("🔐 Verifying webhook signature with secret:", 
         endpointSecret.substring(0, 10) + "...");
       
-      event = stripe.webhooks.constructEvent(
+      // Usar la versión asíncrona de constructEvent
+      event = await stripe.webhooks.constructEventAsync(
         body,
         signature,
         endpointSecret
