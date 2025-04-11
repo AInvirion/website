@@ -53,26 +53,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (session?.user) {
       setIsAuthenticated(true);
       try {
-        const { data: profile, error } = await supabase
+        // Get profile data
+        const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
           .single();
 
-        if (error) {
-          console.error('Error fetching profile:', error);
+        if (profileError) {
+          console.error('Error fetching profile:', profileError);
           setUser(null);
-        } else {
-          const userWithProfile: UserWithRole = {
-            ...session.user,
-            first_name: profile?.first_name || '',
-            last_name: profile?.last_name || '',
-            avatar_url: profile?.avatar_url || '',
-            role: profile?.role || 'usuario',
-            credits: profile?.credits || 0,
-          };
-          setUser(userWithProfile);
+          return;
         }
+
+        // Get user role from user_roles table
+        const { data: userRole, error: roleError } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+
+        if (roleError && roleError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+          console.error('Error fetching user role:', roleError);
+        }
+
+        const userWithProfile: UserWithRole = {
+          ...session.user,
+          first_name: profile?.first_name || '',
+          last_name: profile?.last_name || '',
+          avatar_url: profile?.avatar_url || '',
+          credits: profile?.credits || 0,
+          role: userRole?.role || 'usuario'
+        };
+        
+        setUser(userWithProfile);
       } catch (error) {
         console.error('Error setting user from session:', error);
         setUser(null);
@@ -173,24 +187,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (!user?.id) return;
     
     try {
-      const { data, error } = await supabase
+      const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
         
-      if (error) {
-        console.error('Error fetching updated user data:', error);
+      if (profileError) {
+        console.error('Error fetching updated user data:', profileError);
         return;
       }
       
-      if (data) {
+      // Get user role from user_roles table
+      const { data: userRole, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single();
+
+      if (roleError && roleError.code !== 'PGRST116') {
+        console.error('Error fetching user role:', roleError);
+      }
+      
+      if (profile) {
         setUser(prevUser => ({
           ...prevUser,
-          ...data
+          ...profile,
+          role: userRole?.role || 'usuario'
         }));
         
-        console.log('User data refreshed successfully:', data);
+        console.log('User data refreshed successfully:', profile);
       }
     } catch (error) {
       console.error('Failed to refresh user data:', error);
