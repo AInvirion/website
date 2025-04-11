@@ -15,60 +15,80 @@ const PaymentSuccess = () => {
   const { user, refreshUserData } = useAuth();
   const sessionId = searchParams.get("session_id");
   const [isVerifying, setIsVerifying] = useState(true);
+  const [retries, setRetries] = useState(0);
 
-  // Verificar el estado del pago
+  // Verify the payment status
   const verifyPayment = async () => {
     try {
-      // En una implementación real, deberíamos verificar el estado de la sesión con el servidor
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Actual verification
+      if (sessionId) {
+        console.log("Verifying payment with session ID:", sessionId);
+      }
       
-      // Refrescar datos del usuario para obtener el saldo actualizado
+      // Wait for a moment to give webhook time to process
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Refresh user data to get updated credit balance
       await refreshUserData();
       return true;
     } catch (error) {
-      console.error("Error al verificar el pago:", error);
+      console.error("Error verifying payment:", error);
       return false;
     } finally {
       setIsVerifying(false);
     }
   };
 
-  // Consultar las transacciones recientes del usuario
+  // Query for recent transaction associated with this session ID or just the most recent one
   const { data: recentTransaction, isLoading, refetch } = useQuery({
-    queryKey: ["recent-transaction", user?.id],
+    queryKey: ["recent-transaction", user?.id, sessionId, retries],
     queryFn: async () => {
       if (!user?.id) return null;
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("credit_transactions")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", user.id);
+      
+      // If we have a session ID from Stripe, use it to find the specific transaction
+      if (sessionId) {
+        query = query.eq("reference_id", sessionId);
+      }
+        
+      const { data, error } = await query
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
 
+      if (error && error.code === "PGRST116") {
+        // "No rows returned" error - this is OK, transaction might not be recorded yet
+        console.log("No transaction found yet, may need to wait for webhook processing");
+        return null;
+      }
+      
       if (error) throw error;
       return data;
     },
     enabled: !!user?.id && !isVerifying,
-    refetchInterval: 3000, // Reintentar cada 3 segundos si no hay transacción
+    refetchInterval: recentTransaction ? false : 5000, // Poll every 5 seconds until we find a transaction
     refetchIntervalInBackground: true,
-    retry: 5,
+    retry: 3,
   });
 
   const handleRefresh = async () => {
     toast("Actualizando datos...", { duration: 2000 });
     await refreshUserData();
+    setRetries(prev => prev + 1);
     refetch();
   };
 
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId || user?.id) {
       verifyPayment();
     } else {
       setIsVerifying(false);
     }
-  }, [sessionId]);
+  }, [sessionId, user?.id]);
 
   if (isVerifying || isLoading) {
     return (
@@ -91,7 +111,7 @@ const PaymentSuccess = () => {
         </CardHeader>
         <CardContent className="text-center pt-4 pb-6">
           <p className="text-gray-600 mb-6">
-            Tu pago ha sido procesado correctamente y los créditos han sido añadidos a tu cuenta.
+            Tu pago ha sido procesado correctamente y los créditos serán añadidos a tu cuenta pronto.
           </p>
 
           {recentTransaction ? (
@@ -106,6 +126,14 @@ const PaymentSuccess = () => {
                 </p>
                 <p className="text-gray-500 text-left">Estado:</p>
                 <p className="font-semibold text-right text-green-600">Completado</p>
+                {recentTransaction.reference_id && (
+                  <>
+                    <p className="text-gray-500 text-left">Referencia:</p>
+                    <p className="font-semibold text-right text-xs truncate" title={recentTransaction.reference_id}>
+                      {recentTransaction.reference_id.substring(0, 16)}...
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           ) : (

@@ -8,7 +8,7 @@ interface TransactionItemProps {
   formatDate: (dateString: string) => string;
 }
 
-// Función auxiliar para obtener el texto y color según el tipo de transacción
+// Helper function to get text and color based on transaction type
 const getTransactionDetails = (type: TransactionType, amount: number) => {
   const isPositive = amount > 0;
   
@@ -70,9 +70,16 @@ export function TransactionItem({ transaction, formatDate }: TransactionItemProp
           {icon}
           <div>
             <p className="font-medium">{text}</p>
-            <p className="text-xs text-gray-500">
-              {transaction.created_at ? formatDate(transaction.created_at) : 'Fecha no disponible'}
-            </p>
+            <div className="flex flex-col">
+              <p className="text-xs text-gray-500">
+                {transaction.created_at ? formatDate(transaction.created_at) : 'Fecha no disponible'}
+              </p>
+              {transaction.reference_id && (
+                <p className="text-xs text-gray-400 truncate" title={transaction.reference_id}>
+                  Ref: {transaction.reference_id.substring(0, 8)}...
+                </p>
+              )}
+            </div>
           </div>
         </div>
         {showAmount && (

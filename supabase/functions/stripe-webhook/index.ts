@@ -42,9 +42,24 @@ serve(async (req) => {
 
     const body = await req.text();
     console.log("📩 Received webhook with payload:", body.substring(0, 100) + "...");
-    console.log("🔑 Using webhook secret (first few chars):", endpointSecret.substring(0, 4) + "...");
+    
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
+    
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("⚠️ Supabase credentials missing");
+      return new Response(JSON.stringify({ error: "Supabase configuration missing" }), { 
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    
+    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
     
     let event;
+    
+    // Verify webhook signature
     try {
       event = stripe.webhooks.constructEvent(
         body,
@@ -59,20 +74,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
-    
-    if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("⚠️ Supabase credentials missing");
-      return new Response(JSON.stringify({ error: "Supabase configuration missing" }), { 
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-    
-    const supabaseClient = createClient(supabaseUrl, supabaseAnonKey);
 
     // Get session object
     const session = event.data.object;
@@ -115,9 +116,9 @@ serve(async (req) => {
   }
 });
 
-// Funciones para manejar cada tipo de evento
+// Functions to handle each type of event
 
-// Manejo de checkout.session.completed
+// Handle checkout.session.completed
 async function handleCheckoutSessionCompleted(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
     console.error("❌ No user ID in metadata");
@@ -127,74 +128,77 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
   const userId = session.metadata.user_id;
   console.log(`🧑 Processing for user: ${userId}`);
   
-  // Procesar según el tipo de compra
-  if (session.metadata.type === "credit_package") {
-    const credits = Number(session.metadata.credits) || 0;
-    
-    if (credits > 0) {
-      console.log(`💰 Adding ${credits} credits for user ${userId}`);
+  try {
+    // Process based on purchase type
+    if (session.metadata.type === "credit_package") {
+      const credits = Number(session.metadata.credits) || 0;
       
-      try {
-        // Registrar la transacción de créditos
+      if (credits > 0) {
+        console.log(`💰 Adding ${credits} credits for user ${userId}`);
+        
+        // Register the credit transaction
         const { data: transactionData, error: transactionError } = await supabaseClient
           .from("credit_transactions")
           .insert({
             user_id: userId,
             amount: credits,
             type: "purchase",
-            reference_id: session.metadata.package_id,
+            reference_id: session.id, // Using session ID as reference
           })
           .select();
           
         if (transactionError) {
           console.error(`❌ Error registering transaction: ${transactionError.message}`);
+          console.error("Transaction error details:", JSON.stringify(transactionError));
           throw transactionError;
         }
         
         console.log(`✅ Transaction registered: ${transactionData?.[0]?.id || 'unknown ID'}`);
         console.log(`✅ ${credits} credits added for user ${userId}`);
-        
-      } catch (error) {
-        console.error(`❌ Error processing credit purchase: ${error.message}`);
       }
-    }
-  } 
-  else if (session.metadata.type === "direct_service") {
-    // Implementar lógica para procesar el pago directo por un servicio
-    console.log(`✅ Direct payment for service ${session.metadata.service_id} for user ${userId}`);
-    
-    try {
-      // Registrar la ejecución del servicio como "pagado"
-      const { data: serviceData, error: serviceError } = await supabaseClient
-        .from("service_executions")
-        .insert({
-          service_id: session.metadata.service_id,
-          user_id: userId,
-          credits_used: 0, // No se usaron créditos, fue pago directo
-          status: "paid",
-        })
-        .select();
-        
-      if (serviceError) {
-        console.error(`❌ Error registering service execution: ${serviceError.message}`);
-        throw serviceError;
-      }
+    } 
+    else if (session.metadata.type === "direct_service") {
+      // Implement logic to process the direct payment for a service
+      console.log(`✅ Direct payment for service ${session.metadata.service_id} for user ${userId}`);
       
-      console.log(`✅ Service execution registered: ${serviceData?.[0]?.id || 'unknown ID'}`);
-    } catch (error) {
-      console.error(`❌ Error processing service payment: ${error.message}`);
+      try {
+        // Register the service execution as "paid"
+        const { data: serviceData, error: serviceError } = await supabaseClient
+          .from("service_executions")
+          .insert({
+            service_id: session.metadata.service_id,
+            user_id: userId,
+            credits_used: 0, // No credits used, it was direct payment
+            status: "paid",
+          })
+          .select();
+          
+        if (serviceError) {
+          console.error(`❌ Error registering service execution: ${serviceError.message}`);
+          console.error("Service error details:", JSON.stringify(serviceError));
+          throw serviceError;
+        }
+        
+        console.log(`✅ Service execution registered: ${serviceData?.[0]?.id || 'unknown ID'}`);
+      } catch (error) {
+        console.error(`❌ Error processing service payment: ${error.message}`);
+      }
     }
+  } catch (error) {
+    console.error(`❌ Error in handleCheckoutSessionCompleted: ${error.message}`);
+    console.error("Error details:", JSON.stringify(error));
+    // We don't re-throw here to avoid failing the webhook overall
   }
 }
 
-// Manejo de checkout.session.async_payment_succeeded
+// Handle checkout.session.async_payment_succeeded
 async function handleAsyncPaymentSucceeded(session, supabaseClient) {
-  // Similar al completed, pero para pagos asíncronos exitosos
+  // Similar to completed, but for asynchronous payments that succeeded
   console.log(`💰 Async payment success: ${session.id}`);
   await handleCheckoutSessionCompleted(session, supabaseClient);
 }
 
-// Manejo de checkout.session.async_payment_failed
+// Handle checkout.session.async_payment_failed
 async function handleAsyncPaymentFailed(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
     console.error("❌ No user ID in metadata");
@@ -205,25 +209,27 @@ async function handleAsyncPaymentFailed(session, supabaseClient) {
   console.log(`❌ Async payment failed for user ${userId}`);
 
   try {
-    // Registrar el fallo del pago
+    // Register the failed payment
     const { error } = await supabaseClient
       .from("credit_transactions")
       .insert({
         user_id: userId,
-        amount: 0,
+        amount: 0, // No credits added for failed payment
         type: "payment_failed",
         reference_id: session.id,
       });
       
     if (error) {
       console.error(`❌ Error registering payment failure: ${error.message}`);
+      console.error("Error details:", JSON.stringify(error));
     }
   } catch (error) {
-    console.error(`❌ Error processing payment failure: ${error.message}`);
+    console.error(`❌ Error in handleAsyncPaymentFailed: ${error.message}`);
+    console.error("Error details:", JSON.stringify(error));
   }
 }
 
-// Manejo de checkout.session.expired
+// Handle checkout.session.expired
 async function handleCheckoutSessionExpired(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
     console.error("❌ No user ID in metadata");
@@ -234,20 +240,22 @@ async function handleCheckoutSessionExpired(session, supabaseClient) {
   console.log(`⏱️ Payment session expired for user ${userId}`);
 
   try {
-    // Registrar la expiración de la sesión
+    // Register the session expiration
     const { error } = await supabaseClient
       .from("credit_transactions")
       .insert({
         user_id: userId,
-        amount: 0,
+        amount: 0, // No credits for expired session
         type: "session_expired",
         reference_id: session.id,
       });
       
     if (error) {
       console.error(`❌ Error registering session expiration: ${error.message}`);
+      console.error("Error details:", JSON.stringify(error));
     }
   } catch (error) {
-    console.error(`❌ Error processing session expiration: ${error.message}`);
+    console.error(`❌ Error in handleCheckoutSessionExpired: ${error.message}`);
+    console.error("Error details:", JSON.stringify(error));
   }
 }
