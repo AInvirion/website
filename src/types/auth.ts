@@ -1,12 +1,9 @@
 
-import { Session, User as SupabaseUser } from "@supabase/supabase-js";
-
-// Export the Supabase User type for components that need it
-export type { SupabaseUser as User };
+import { Session, User } from "@supabase/supabase-js";
 
 export type AppRole = "usuario" | "admin";
 
-export interface UserWithRole extends SupabaseUser {
+export interface UserWithRole extends User {
   role?: AppRole;
   first_name?: string;
   last_name?: string;
