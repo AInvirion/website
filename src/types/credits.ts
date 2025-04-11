@@ -35,3 +35,4 @@ export type TransactionType =
   | 'payment_failed'  // Fallo en el pago
   | 'addition'        // Adición manual de créditos (ej. por admin)
   | 'session_expired'; // Sesión de pago expirada
+

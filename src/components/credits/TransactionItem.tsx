@@ -1,7 +1,7 @@
 
 import { Card, CardContent } from "@/components/ui/card";
 import { CreditTransaction, TransactionType } from "@/types/credits";
-import { ShieldAlert, ShieldCheck, Clock } from "lucide-react";
+import { ShieldAlert, ShieldCheck, Clock, DollarSign, CreditCard, MinusCircle, PlusCircle } from "lucide-react";
 
 interface TransactionItemProps {
   transaction: CreditTransaction;
@@ -17,21 +17,26 @@ const getTransactionDetails = (type: TransactionType, amount: number) => {
       return { 
         text: "Compra de créditos", 
         colorClass: "text-green-600",
-        icon: null
+        icon: <PlusCircle className="h-4 w-4 text-green-600" />
       };
     case 'service_payment':
-    case 'consumption':
-    case 'usage':
       return { 
         text: "Pago por servicio", 
         colorClass: "text-orange-600",
-        icon: null
+        icon: <CreditCard className="h-4 w-4 text-orange-600" />
+      };
+    case 'consumption':
+    case 'usage':
+      return { 
+        text: "Uso de créditos", 
+        colorClass: "text-orange-600",
+        icon: <MinusCircle className="h-4 w-4 text-orange-600" />
       };
     case 'addition':
       return { 
         text: "Créditos añadidos", 
         colorClass: "text-green-600",
-        icon: null
+        icon: <PlusCircle className="h-4 w-4 text-green-600" />
       };
     case 'payment_failed':
       return { 
@@ -49,7 +54,7 @@ const getTransactionDetails = (type: TransactionType, amount: number) => {
       return { 
         text: isPositive ? "Adición de créditos" : "Uso de créditos", 
         colorClass: isPositive ? "text-green-600" : "text-orange-600",
-        icon: null
+        icon: isPositive ? <PlusCircle className="h-4 w-4 text-green-600" /> : <MinusCircle className="h-4 w-4 text-orange-600" />
       };
   }
 };

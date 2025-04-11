@@ -24,6 +24,9 @@ export function CreditPackageList() {
 
     try {
       const origin = window.location.origin;
+      
+      console.log("Iniciando proceso de compra para el paquete:", packageId);
+      console.log("URL de origen:", origin);
 
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
@@ -33,16 +36,21 @@ export function CreditPackageList() {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error al invocar la función create-checkout:", error);
+        throw error;
+      }
 
-      // Redirigir a la URL de checkout de Stripe
-      if (data?.url) {
-        window.location.href = data.url;
-      } else {
+      if (!data?.url) {
+        console.error("No se recibió URL de checkout en la respuesta:", data);
         throw new Error("No se pudo crear la sesión de pago");
       }
+
+      console.log("URL de checkout recibida:", data.url);
+      // Redirigir a la URL de checkout de Stripe
+      window.location.href = data.url;
     } catch (error) {
-      console.error("Error al iniciar el proceso de compra:", error);
+      console.error("Error detallado al iniciar el proceso de compra:", error);
       toast("Error al procesar la compra", {
         description: "Intenta nuevamente más tarde",
         className: "bg-red-500"
