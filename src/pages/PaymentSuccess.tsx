@@ -17,6 +17,8 @@ const PaymentSuccess = () => {
   const sessionId = searchParams.get("session_id");
   const [isVerifying, setIsVerifying] = useState(true);
   const [retries, setRetries] = useState(0);
+  // Initialize transactionFound state to track if we've found a transaction
+  const [transactionFound, setTransactionFound] = useState(false);
 
   // Verify the payment status
   const verifyPayment = async () => {
@@ -41,7 +43,7 @@ const PaymentSuccess = () => {
   };
 
   // Query for recent transaction associated with this session ID or just the most recent one
-  const { data: recentTransaction, isLoading, refetch } = useQuery<CreditTransaction>({
+  const { data: recentTransaction, isLoading, refetch } = useQuery({
     queryKey: ["recent-transaction", user?.id, sessionId, retries],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -68,10 +70,16 @@ const PaymentSuccess = () => {
       }
       
       if (error) throw error;
-      return data as CreditTransaction;
+      
+      // If we found a transaction, update our state
+      if (data) {
+        setTransactionFound(true);
+      }
+      
+      return data as unknown as CreditTransaction;
     },
     enabled: !!user?.id && !isVerifying,
-    refetchInterval: recentTransaction ? false : 5000, // Poll every 5 seconds until we find a transaction
+    refetchInterval: transactionFound ? false : 5000, // Poll every 5 seconds until we find a transaction
     refetchIntervalInBackground: true,
     retry: 3,
   });
@@ -90,6 +98,13 @@ const PaymentSuccess = () => {
       setIsVerifying(false);
     }
   }, [sessionId, user?.id]);
+
+  useEffect(() => {
+    // Update transactionFound state when we get a transaction
+    if (recentTransaction) {
+      setTransactionFound(true);
+    }
+  }, [recentTransaction]);
 
   if (isVerifying || isLoading) {
     return (
