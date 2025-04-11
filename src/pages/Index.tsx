@@ -5,9 +5,12 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
+  
+  console.log("Index page - isAuthenticated:", isAuthenticated);
 
   // Redirect authenticated users directly to the services page
   if (isAuthenticated) {
+    console.log("User is authenticated, redirecting to /dashboard/servicios");
     return <Navigate to="/dashboard/servicios" />;
   }
 

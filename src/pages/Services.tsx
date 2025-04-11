@@ -24,14 +24,20 @@ const ServicesPage = () => {
   const { data: services, isLoading } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("services")
-        .select("*")
-        .order("price");
+      try {
+        const { data, error } = await supabase
+          .from("services")
+          .select("*")
+          .order("price");
 
-      if (error) throw error;
-      // Usamos cast a unknown primero para evitar errores de tipado
-      return data as unknown as Service[];
+        if (error) throw error;
+        console.log("Services loaded:", data);
+        // Usamos cast a unknown primero para evitar errores de tipado
+        return data as unknown as Service[];
+      } catch (error) {
+        console.error("Error fetching services:", error);
+        return [];
+      }
     },
   });
 
@@ -61,7 +67,7 @@ const ServicesPage = () => {
   ];
 
   return (
-    <div>
+    <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold">Servicios Disponibles</h1>
         {isAdmin && (
@@ -75,7 +81,7 @@ const ServicesPage = () => {
       </div>
 
       <div className="bg-blue-50 rounded-lg p-4 border border-blue-100 text-blue-800 mb-8">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
           <div>
             <p className="font-medium">Tu saldo disponible: <span className="font-bold">{user?.credits || 0} créditos</span></p>
             <p className="text-sm text-blue-600">1 crédito equivale a $4.00 USD</p>
