@@ -1,7 +1,9 @@
+
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { CreditPackage } from "@/types/credits";
 import { CreditPackageCard } from "./CreditPackageCard";
 import { useCreditPackages } from "@/hooks/useCreditPackages";
 import { useAuth } from "@/contexts/AuthContext";
@@ -14,18 +16,18 @@ export function CreditPackageList() {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
-  // Format price in USD
+  // Formatear precio en USD
   const formatPrice = (priceInCents: number): string => {
     return `$${(priceInCents / 100).toFixed(2)} USD`;
   };
 
-  // Function to start the purchase process
+  // Función para iniciar el proceso de compra
   const handlePurchase = async (packageId: string) => {
-    // Verify if user is authenticated
+    // Verificar si el usuario está autenticado
     if (!isAuthenticated || !user) {
-      console.log("User not authenticated, redirecting to login");
-      toast("Login required", {
-        description: "You need to log in to purchase credits",
+      console.log("Usuario no autenticado, redirigiendo a login");
+      toast("Es necesario iniciar sesión", {
+        description: "Debes iniciar sesión para comprar créditos",
         className: "bg-blue-500"
       });
       navigate("/auth");
@@ -38,9 +40,9 @@ export function CreditPackageList() {
     try {
       const origin = window.location.origin;
       
-      console.log("Starting purchase process for package:", packageId);
-      console.log("Origin URL:", origin);
-      console.log("Authenticated user:", user.id);
+      console.log("Iniciando proceso de compra para el paquete:", packageId);
+      console.log("URL de origen:", origin);
+      console.log("Usuario autenticado:", user.id);
 
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
@@ -51,22 +53,22 @@ export function CreditPackageList() {
       });
 
       if (error) {
-        console.error("Error invoking create-checkout function:", error);
+        console.error("Error al invocar la función create-checkout:", error);
         throw error;
       }
 
       if (!data?.url) {
-        console.error("No checkout URL received in response:", data);
-        throw new Error("Could not create payment session");
+        console.error("No se recibió URL de checkout en la respuesta:", data);
+        throw new Error("No se pudo crear la sesión de pago");
       }
 
-      console.log("Checkout URL received:", data.url);
-      // Redirect to Stripe checkout URL
+      console.log("URL de checkout recibida:", data.url);
+      // Redirigir a la URL de checkout de Stripe
       window.location.href = data.url;
     } catch (error) {
-      console.error("Detailed error when starting purchase process:", error);
-      toast("Error processing purchase", {
-        description: "Please try again later or contact support",
+      console.error("Error detallado al iniciar el proceso de compra:", error);
+      toast("Error al procesar la compra", {
+        description: "Intenta nuevamente más tarde o contacta a soporte",
         className: "bg-red-500"
       });
     } finally {
