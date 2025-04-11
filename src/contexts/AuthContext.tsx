@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   signIn: (email: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
@@ -53,7 +53,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (session?.user) {
       setIsAuthenticated(true);
       try {
-        // Get profile data
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
@@ -66,14 +65,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           return;
         }
 
-        // Get user role from user_roles table
         const { data: userRole, error: roleError } = await supabase
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
           .single();
 
-        if (roleError && roleError.code !== 'PGRST116') { // PGRST116 is "no rows returned" error
+        if (roleError && roleError.code !== 'PGRST116') {
           console.error('Error fetching user role:', roleError);
         }
 
@@ -113,6 +111,23 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const signInWithGoogle = async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth`
+        }
+      });
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error signing in with Google:', error);
+      alert('Error signing in with Google: ' + error);
+      setIsLoading(false);
+    }
+  };
+
   const signUp = async (email: string, password: string, firstName: string, lastName: string): Promise<void> => {
     setIsLoading(true);
     try {
@@ -129,7 +144,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
       if (error) throw error;
 
-      // After successful signup, update the profile table
       if (data.user?.id) {
         const { error: profileError } = await supabase
           .from('profiles')
@@ -147,7 +161,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         if (profileError) {
           console.error('Error creating profile:', profileError);
-          // Handle the error appropriately, maybe sign out the user
           await signOut();
           alert('Error creating profile: ' + profileError.message);
           return;
@@ -182,7 +195,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return user?.role === role;
   };
 
-  // Refresh user data from the database
   const refreshUserData = async () => {
     if (!user?.id) return;
     
@@ -198,7 +210,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
       
-      // Get user role from user_roles table
       const { data: userRole, error: roleError } = await supabase
         .from('user_roles')
         .select('role')
@@ -228,6 +239,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isAuthenticated,
     isLoading,
     signIn,
+    signInWithGoogle,
     signUp,
     signOut,
     hasRole,
