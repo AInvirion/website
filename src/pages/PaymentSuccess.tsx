@@ -6,12 +6,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, ChevronRight, Loader2 } from "lucide-react";
+import { Check, ChevronRight, Loader2, RefreshCw } from "lucide-react";
+import { toast } from "sonner";
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const sessionId = searchParams.get("session_id");
   const [isVerifying, setIsVerifying] = useState(true);
 
@@ -19,8 +20,10 @@ const PaymentSuccess = () => {
   const verifyPayment = async () => {
     try {
       // En una implementación real, deberíamos verificar el estado de la sesión con el servidor
-      // Por ahora, simplemente esperamos un poco y luego consideramos que es exitoso
       await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Refrescar datos del usuario para obtener el saldo actualizado
+      await refreshUserData();
       return true;
     } catch (error) {
       console.error("Error al verificar el pago:", error);
@@ -31,7 +34,7 @@ const PaymentSuccess = () => {
   };
 
   // Consultar las transacciones recientes del usuario
-  const { data: recentTransaction, isLoading } = useQuery({
+  const { data: recentTransaction, isLoading, refetch } = useQuery({
     queryKey: ["recent-transaction", user?.id],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -48,7 +51,16 @@ const PaymentSuccess = () => {
       return data;
     },
     enabled: !!user?.id && !isVerifying,
+    refetchInterval: 3000, // Reintentar cada 3 segundos si no hay transacción
+    refetchIntervalInBackground: true,
+    retry: 5,
   });
+
+  const handleRefresh = async () => {
+    toast("Actualizando datos...", { duration: 2000 });
+    await refreshUserData();
+    refetch();
+  };
 
   useEffect(() => {
     if (sessionId) {
@@ -82,7 +94,7 @@ const PaymentSuccess = () => {
             Tu pago ha sido procesado correctamente y los créditos han sido añadidos a tu cuenta.
           </p>
 
-          {recentTransaction && (
+          {recentTransaction ? (
             <div className="bg-white rounded-lg p-6 border border-green-100 mb-6">
               <h3 className="font-medium text-gray-800 mb-2">Detalles de la transacción:</h3>
               <div className="grid grid-cols-2 gap-2 text-sm">
@@ -96,10 +108,26 @@ const PaymentSuccess = () => {
                 <p className="font-semibold text-right text-green-600">Completado</p>
               </div>
             </div>
+          ) : (
+            <div className="bg-yellow-50 rounded-lg p-6 border border-yellow-100 mb-6">
+              <h3 className="font-medium text-gray-800 mb-2">Procesando transacción...</h3>
+              <p className="text-sm text-gray-600 mb-3">
+                Tu pago está siendo procesado. Puede tomar unos momentos para que los créditos se reflejen en tu cuenta.
+              </p>
+              <Button variant="outline" size="sm" onClick={handleRefresh} className="flex items-center gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Actualizar datos
+              </Button>
+            </div>
           )}
 
           <div className="bg-blue-50 rounded-lg p-4 border border-blue-100 text-blue-800 text-sm">
-            <p>Tu nuevo saldo de créditos: <span className="font-bold">{user?.credits || 0} créditos</span></p>
+            <p>Tu saldo de créditos: <span className="font-bold">{user?.credits || 0} créditos</span></p>
+            {!recentTransaction && (
+              <p className="text-xs mt-1 text-blue-600">
+                Si tu saldo no se ha actualizado, espera unos minutos y actualiza la página.
+              </p>
+            )}
           </div>
         </CardContent>
         <CardFooter className="flex flex-col space-y-2">

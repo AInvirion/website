@@ -1,206 +1,219 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { User, Session } from '@supabase/supabase-js';
+import { Database } from '@/integrations/supabase/types';
+import { AppRole } from '@/types/auth';
 
-import { createContext, useContext, useEffect, useState } from "react";
-import { Session } from "@supabase/supabase-js";
-import { supabase } from "@/integrations/supabase/client";
-import { AuthState, AppRole, UserWithRole } from "@/types/auth";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+type UserWithRole = Database['public']['Tables']['profiles']['Row'] & {
+  role?: AppRole;
+  credits?: number;
+};
 
-interface AuthContextType extends AuthState {
-  signInWithGoogle: () => Promise<void>;
+interface AuthContextType {
+  user: UserWithRole | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  signIn: (email: string) => Promise<void>;
+  signUp: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
   signOut: () => Promise<void>;
   hasRole: (role: AppRole) => boolean;
+  refreshUserData: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
+
+const supabase = createClientComponentClient<Database>();
+
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<UserWithRole | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const [authState, setAuthState] = useState<AuthState>({
-    session: null,
-    user: null,
-    isLoading: true,
-    isAuthenticated: false,
-  });
 
-  // Función para cargar los roles del usuario usando la función has_role
-  const fetchUserRoles = async (userId: string): Promise<AppRole[]> => {
-    try {
-      // Verificamos primero el rol de usuario
-      const { data: isUserRole, error: userError } = await supabase
-        .rpc('has_role', { _user_id: userId, _role: 'usuario' });
+  useEffect(() => {
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
 
-      // Verificamos el rol de admin
-      const { data: isAdminRole, error: adminError } = await supabase
-        .rpc('has_role', { _user_id: userId, _role: 'admin' });
+      setUserFromSession(session);
+      setIsLoading(false);
+    };
 
-      if (userError || adminError) {
-        console.error("Error verificando roles:", userError || adminError);
-        return [];
+    getSession();
+
+    supabase.auth.onAuthStateChange((event, session) => {
+      console.log('Auth state change event:', event);
+      setUserFromSession(session);
+    });
+  }, []);
+
+  const setUserFromSession = async (session: Session | null) => {
+    if (session?.user) {
+      setIsAuthenticated(true);
+      try {
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+          setUser(null);
+        } else {
+          const userWithProfile: UserWithRole = {
+            id: session.user.id,
+            email: session.user.email || '',
+            firstName: profile?.firstName || '',
+            lastName: profile?.lastName || '',
+            avatarUrl: profile?.avatarUrl || '',
+            role: profile?.role || 'user',
+            credits: profile?.credits || 0,
+          };
+          setUser(userWithProfile);
+        }
+      } catch (error) {
+        console.error('Error setting user from session:', error);
+        setUser(null);
       }
+    } else {
+      setIsAuthenticated(false);
+      setUser(null);
+    }
+    setIsLoading(false);
+  };
 
-      const roles: AppRole[] = [];
-      if (isUserRole) roles.push('usuario');
-      if (isAdminRole) roles.push('admin');
-      
-      return roles;
+  const signIn = async (email: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signInWithOtp({ email });
+      if (error) throw error;
+      alert('Check your email for the magic link to sign in.');
+      navigate('/auth');
     } catch (error) {
-      console.error("Error al obtener roles:", error);
-      return [];
+      console.error('Error signing in:', error);
+      alert('Error signing in: ' + error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Función para cargar los detalles del perfil del usuario
-  const fetchUserProfile = async (userId: string) => {
+  const signUp = async (email: string, password: string, firstName: string, lastName: string): Promise<void> => {
+    setIsLoading(true);
     try {
-      // Usamos solo el ID para obtener el perfil
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            firstName,
+            lastName,
+            avatarUrl: '',
+          },
+        },
+      });
+      if (error) throw error;
+
+      // After successful signup, update the profile table
+      if (data.user?.id) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([
+            {
+              id: data.user.id,
+              firstName,
+              lastName,
+              email,
+              avatarUrl: '',
+              credits: 0,
+              role: 'user',
+            },
+          ]);
+
+        if (profileError) {
+          console.error('Error creating profile:', profileError);
+          // Handle the error appropriately, maybe sign out the user
+          await signOut();
+          alert('Error creating profile: ' + profileError.message);
+          return;
+        }
+      }
+
+      alert('Check your email for the verification link.');
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error signing up:', error);
+      alert('Error signing up: ' + error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const signOut = async (): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      navigate('/auth');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      alert('Error signing out: ' + error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const hasRole = (role: AppRole): boolean => {
+    return user?.role === role;
+  };
+
+  // Refresh user data from the database
+  const refreshUserData = async () => {
+    if (!user?.id) return;
+    
+    try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
-        .maybeSingle();
-
+        .eq('id', user.id)
+        .single();
+        
       if (error) {
-        console.error("Error al obtener perfil:", error);
-        return null;
-      }
-
-      return data;
-    } catch (error) {
-      console.error("Error al obtener perfil:", error);
-      return null;
-    }
-  };
-
-  // Actualizar el estado de autenticación cuando cambia la sesión
-  useEffect(() => {
-    const setUserWithDetails = async (session: Session | null) => {
-      if (!session) {
-        setAuthState({
-          session: null,
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-        });
+        console.error('Error fetching updated user data:', error);
         return;
       }
-
-      // Obtener la información básica del usuario
-      const user = session.user;
-
-      // Si tenemos un usuario, obtenemos sus roles y perfil
-      if (user) {
-        // Debemos usar setTimeout para evitar un deadlock en el listener de eventos
-        setTimeout(async () => {
-          // Obtener roles y perfil en paralelo
-          const [roles, profile] = await Promise.all([
-            fetchUserRoles(user.id),
-            fetchUserProfile(user.id),
-          ]);
-
-          // Crear un objeto de usuario extendido con roles y detalles del perfil
-          const userWithRole: UserWithRole = {
-            ...user,
-            roles,
-            firstName: profile?.first_name,
-            lastName: profile?.last_name,
-            avatarUrl: profile?.avatar_url,
-            credits: profile?.credits,
-          };
-
-          setAuthState({
-            session,
-            user: userWithRole,
-            isLoading: false,
-            isAuthenticated: true,
-          });
-        }, 0);
-      } else {
-        setAuthState({
-          session,
-          user: null,
-          isLoading: false,
-          isAuthenticated: false,
-        });
-      }
-    };
-
-    // Verificar si ya existe una sesión
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUserWithDetails(session);
-    });
-
-    // Escuchar cambios en el estado de autenticación
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_, session) => {
-      setUserWithDetails(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // Iniciar sesión con Google
-  const signInWithGoogle = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-        },
-      });
-
-      if (error) {
-        console.error("Error signing in with Google:", error);
-        toast("Error al iniciar sesión con Google", {
-          description: error.message,
-          className: "bg-red-500"
-        });
+      
+      if (data) {
+        setUser(prevUser => ({
+          ...prevUser,
+          ...data
+        }));
+        
+        console.log('User data refreshed successfully:', data);
       }
     } catch (error) {
-      console.error("Error signing in with Google:", error);
-      toast("Error al iniciar sesión con Google", {
-        className: "bg-red-500"
-      });
+      console.error('Failed to refresh user data:', error);
     }
-  };
-
-  // Cerrar sesión
-  const signOut = async () => {
-    try {
-      await supabase.auth.signOut();
-      navigate("/");
-      toast("Sesión cerrada", {
-        description: "Has cerrado sesión correctamente",
-        className: "bg-green-500"
-      });
-    } catch (error) {
-      console.error("Error signing out:", error);
-      toast("Error al cerrar sesión", {
-        className: "bg-red-500"
-      });
-    }
-  };
-
-  // Verificar si el usuario tiene un rol específico
-  const hasRole = (role: AppRole) => {
-    return authState.user?.roles?.includes(role) || false;
   };
 
   const value = {
-    ...authState,
-    signInWithGoogle,
+    user,
+    isAuthenticated,
+    isLoading,
+    signIn,
+    signUp,
     signOut,
     hasRole,
+    refreshUserData, // Add the new method to the context
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-};
-
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error("useAuth must be used within an AuthProvider");
-  }
-  return context;
 };
