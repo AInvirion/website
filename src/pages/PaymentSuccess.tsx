@@ -17,15 +17,16 @@ const PaymentSuccess = () => {
   const sessionId = searchParams.get("session_id");
   const [isVerifying, setIsVerifying] = useState(true);
   const [retries, setRetries] = useState(0);
-  // Initialize transactionFound state to track if we've found a transaction
   const [transactionFound, setTransactionFound] = useState(false);
+  const [manualRefreshCount, setManualRefreshCount] = useState(0);
 
   // Verify the payment status
   const verifyPayment = async () => {
     try {
       // Actual verification
       if (sessionId) {
-        console.log("Verifying payment with session ID:", sessionId);
+        console.log("Verificando pago con ID de sesión:", sessionId);
+        toast.info("Verificando tu pago...");
       }
       
       // Wait for a moment to give webhook time to process
@@ -35,7 +36,7 @@ const PaymentSuccess = () => {
       await refreshUserData();
       return true;
     } catch (error) {
-      console.error("Error verifying payment:", error);
+      console.error("Error verificando el pago:", error);
       return false;
     } finally {
       setIsVerifying(false);
@@ -44,9 +45,12 @@ const PaymentSuccess = () => {
 
   // Query for recent transaction associated with this session ID or just the most recent one
   const { data: recentTransaction, isLoading, refetch } = useQuery({
-    queryKey: ["recent-transaction", user?.id, sessionId, retries],
+    queryKey: ["recent-transaction", user?.id, sessionId, retries, manualRefreshCount],
     queryFn: async () => {
       if (!user?.id) return null;
+
+      console.log("Buscando transacción para el usuario:", user.id);
+      console.log("ID de sesión:", sessionId || "No disponible");
 
       let query = supabase
         .from("credit_transactions")
@@ -65,7 +69,7 @@ const PaymentSuccess = () => {
 
       if (error && error.code === "PGRST116") {
         // "No rows returned" error - this is OK, transaction might not be recorded yet
-        console.log("No transaction found yet, may need to wait for webhook processing");
+        console.log("No se encontró ninguna transacción aún, puede ser necesario esperar al procesamiento del webhook");
         return null;
       }
       
@@ -73,7 +77,11 @@ const PaymentSuccess = () => {
       
       // If we found a transaction, update our state
       if (data) {
+        console.log("Transacción encontrada:", data);
         setTransactionFound(true);
+        
+        // Ensure user data is refreshed when transaction is found
+        refreshUserData();
       }
       
       return data as unknown as CreditTransaction;
@@ -85,10 +93,49 @@ const PaymentSuccess = () => {
   });
 
   const handleRefresh = async () => {
-    toast("Actualizando datos...", { duration: 2000 });
+    toast.info("Actualizando datos...");
     await refreshUserData();
     setRetries(prev => prev + 1);
+    setManualRefreshCount(prev => prev + 1);
     refetch();
+  };
+
+  // Si no se encuentra una transacción después de varios intentos, intentar la recuperación manual
+  const handleManualRecovery = async () => {
+    if (!user?.id || !sessionId) {
+      toast.error("No se puede procesar la recuperación sin información de sesión");
+      return;
+    }
+
+    toast.loading("Intentando recuperar el pago...");
+
+    try {
+      // Llamar a una función que intente recuperar el pago usando el ID de sesión
+      const { data, error } = await supabase.functions.invoke("create-checkout", {
+        body: {
+          action: "verify_session",
+          sessionId: sessionId,
+          userId: user.id
+        },
+      });
+
+      if (error) {
+        console.error("Error al verificar la sesión:", error);
+        toast.error("Error al verificar el pago");
+        return;
+      }
+
+      if (data?.success) {
+        toast.success("¡Pago verificado correctamente!");
+        await refreshUserData();
+        refetch();
+      } else {
+        toast.error("No se pudo verificar el pago automáticamente");
+      }
+    } catch (error) {
+      console.error("Error en la recuperación manual:", error);
+      toast.error("Error en el proceso de recuperación");
+    }
   };
 
   useEffect(() => {
@@ -105,6 +152,22 @@ const PaymentSuccess = () => {
       setTransactionFound(true);
     }
   }, [recentTransaction]);
+
+  // Efectuar una actualización periódica del saldo del usuario
+  useEffect(() => {
+    let timer: number;
+    
+    if (user?.id && !transactionFound) {
+      timer = window.setInterval(() => {
+        console.log("Actualizando datos del usuario automáticamente...");
+        refreshUserData();
+      }, 10000); // Cada 10 segundos
+    }
+    
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [user?.id, transactionFound, refreshUserData]);
 
   if (isVerifying || isLoading) {
     return (
@@ -138,7 +201,7 @@ const PaymentSuccess = () => {
                 <p className="font-semibold text-right">{recentTransaction.amount} créditos</p>
                 <p className="text-gray-500 text-left">Fecha:</p>
                 <p className="font-semibold text-right">
-                  {new Date(recentTransaction.created_at).toLocaleDateString()}
+                  {new Date(recentTransaction.created_at || "").toLocaleDateString()}
                 </p>
                 <p className="text-gray-500 text-left">Estado:</p>
                 <p className="font-semibold text-right text-green-600">Completado</p>
@@ -158,10 +221,17 @@ const PaymentSuccess = () => {
               <p className="text-sm text-gray-600 mb-3">
                 Tu pago está siendo procesado. Puede tomar unos momentos para que los créditos se reflejen en tu cuenta.
               </p>
-              <Button variant="outline" size="sm" onClick={handleRefresh} className="flex items-center gap-2">
-                <RefreshCw className="h-4 w-4" />
-                Actualizar datos
-              </Button>
+              <div className="flex flex-col gap-2">
+                <Button variant="outline" size="sm" onClick={handleRefresh} className="flex items-center gap-2">
+                  <RefreshCw className="h-4 w-4" />
+                  Actualizar datos
+                </Button>
+                {retries > 3 && (
+                  <Button variant="secondary" size="sm" onClick={handleManualRecovery} className="flex items-center gap-2">
+                    Intentar recuperación manual
+                  </Button>
+                )}
+              </div>
             </div>
           )}
 

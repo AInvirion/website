@@ -15,7 +15,7 @@ serve(async (req) => {
   }
   
   const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
-  const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET") || "";
+  const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
   
   if (!stripeSecretKey) {
     console.error("⚠️ STRIPE_SECRET_KEY not configured in environment");
@@ -25,8 +25,16 @@ serve(async (req) => {
     );
   }
   
+  if (!endpointSecret) {
+    console.error("⚠️ STRIPE_WEBHOOK_SECRET not configured in environment");
+    return new Response(
+      JSON.stringify({ error: "STRIPE_WEBHOOK_SECRET missing in environment" }), 
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  }
+  
   const stripe = new Stripe(stripeSecretKey, {
-    apiVersion: "2023-10-16",
+    apiVersion: "2023-10-16", // Mantener esta versión para compatibilidad
   });
 
   try {
@@ -41,7 +49,8 @@ serve(async (req) => {
     }
 
     const body = await req.text();
-    console.log("📩 Received webhook with payload:", body.substring(0, 100) + "...");
+    console.log("📩 Received webhook with payload size:", body.length);
+    console.log("📩 Signature:", signature.substring(0, 20) + "...");
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
@@ -61,6 +70,9 @@ serve(async (req) => {
     
     // Verify webhook signature
     try {
+      console.log("🔐 Verifying webhook signature with secret:", 
+        endpointSecret.substring(0, 10) + "...");
+      
       event = stripe.webhooks.constructEvent(
         body,
         signature,
@@ -78,7 +90,12 @@ serve(async (req) => {
     // Get session object
     const session = event.data.object;
     console.log(`🔄 Processing event ${event.type} for session ${session.id}`);
-    console.log(`📝 Session metadata:`, session.metadata);
+    
+    if (session.metadata) {
+      console.log(`📝 Session metadata:`, JSON.stringify(session.metadata));
+    } else {
+      console.warn("⚠️ No metadata found in session");
+    }
 
     // Handle different event types
     switch (event.type) {
@@ -103,12 +120,13 @@ serve(async (req) => {
     }
 
     // Return a response to acknowledge receipt of the event
-    return new Response(JSON.stringify({ received: true }), {
+    return new Response(JSON.stringify({ received: true, event_type: event.type }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error(`❌ Error processing webhook: ${err.message}`);
+    console.error("Error stack:", err.stack);
     return new Response(JSON.stringify({ error: `Webhook error: ${err.message}` }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -154,7 +172,51 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
         }
         
         console.log(`✅ Transaction registered: ${transactionData?.[0]?.id || 'unknown ID'}`);
-        console.log(`✅ ${credits} credits added for user ${userId}`);
+        
+        // Verificar el saldo actual del usuario para diagnóstico
+        const { data: userData, error: userError } = await supabaseClient
+          .from("profiles")
+          .select("credits")
+          .eq("id", userId)
+          .single();
+        
+        if (userError) {
+          console.error(`❌ Error checking user credits: ${userError.message}`);
+        } else {
+          console.log(`ℹ️ User credits before update: ${userData?.credits || 0}`);
+        }
+        
+        // El gatillo de base de datos update_user_credits debe actualizar los créditos automáticamente
+        // cuando se inserta la transacción. Si no está funcionando, verificamos aquí.
+        
+        // Verificar nuevamente el saldo después de la transacción
+        const { data: updatedUserData, error: updatedUserError } = await supabaseClient
+          .from("profiles")
+          .select("credits")
+          .eq("id", userId)
+          .single();
+        
+        if (updatedUserError) {
+          console.error(`❌ Error checking updated user credits: ${updatedUserError.message}`);
+        } else {
+          console.log(`ℹ️ User credits after update: ${updatedUserData?.credits || 0}`);
+          
+          // Si los créditos no se actualizaron, intentamos actualizarlos manualmente
+          if (updatedUserData?.credits === userData?.credits) {
+            console.log(`⚠️ Credits not updated by trigger, updating manually`);
+            
+            const { error: updateError } = await supabaseClient
+              .from("profiles")
+              .update({ credits: (userData?.credits || 0) + credits })
+              .eq("id", userId);
+            
+            if (updateError) {
+              console.error(`❌ Error updating credits manually: ${updateError.message}`);
+            } else {
+              console.log(`✅ Credits updated manually: ${credits} added to user ${userId}`);
+            }
+          }
+        }
       }
     } 
     else if (session.metadata.type === "direct_service") {
@@ -193,12 +255,10 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
 
 // Handle checkout.session.async_payment_succeeded
 async function handleAsyncPaymentSucceeded(session, supabaseClient) {
-  // Similar to completed, but for asynchronous payments that succeeded
   console.log(`💰 Async payment success: ${session.id}`);
   await handleCheckoutSessionCompleted(session, supabaseClient);
 }
 
-// Handle checkout.session.async_payment_failed
 async function handleAsyncPaymentFailed(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
     console.error("❌ No user ID in metadata");
@@ -229,7 +289,6 @@ async function handleAsyncPaymentFailed(session, supabaseClient) {
   }
 }
 
-// Handle checkout.session.expired
 async function handleCheckoutSessionExpired(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
     console.error("❌ No user ID in metadata");
