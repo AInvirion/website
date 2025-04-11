@@ -4,9 +4,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { ServiceCard } from "@/components/ServiceCard";
-import { Loader2, Plus } from "lucide-react";
+import { Loader2, Plus, AlertTriangle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { AIChatWidget } from "@/components/AIChatWidget";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useEffect } from "react";
 
 interface Service {
   id: string;
@@ -17,28 +19,40 @@ interface Service {
 }
 
 const ServicesPage = () => {
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, refreshUserData } = useAuth();
   const isAdmin = hasRole('admin');
   
+  // Refresh user data when component mounts to ensure we have latest credits
+  useEffect(() => {
+    refreshUserData();
+  }, [refreshUserData]);
+  
   // Consultar servicios disponibles
-  const { data: services, isLoading } = useQuery({
+  const { data: services, isLoading, error, isError } = useQuery({
     queryKey: ["services"],
     queryFn: async () => {
       try {
+        console.log("Fetching services...");
         const { data, error } = await supabase
           .from("services")
           .select("*")
           .order("price");
 
-        if (error) throw error;
+        if (error) {
+          console.error("Supabase error fetching services:", error);
+          throw error;
+        }
+        
         console.log("Services loaded:", data);
         // Usamos cast a unknown primero para evitar errores de tipado
         return data as unknown as Service[];
       } catch (error) {
         console.error("Error fetching services:", error);
-        return [];
+        throw error;
       }
     },
+    retry: 1,
+    retryDelay: 1000
   });
 
   // Ejemplos de servicios para mostrar en la UI
@@ -66,6 +80,8 @@ const ServicesPage = () => {
     }
   ];
 
+  const displayServices = services?.length ? services : serviceExamples;
+
   return (
     <div className="container mx-auto px-4 py-6">
       <div className="flex justify-between items-center mb-6">
@@ -79,6 +95,15 @@ const ServicesPage = () => {
           </Button>
         )}
       </div>
+      
+      {isError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Error al cargar los servicios. Por favor, intenta de nuevo más tarde.
+          </AlertDescription>
+        </Alert>
+      )}
 
       <div className="bg-blue-50 rounded-lg p-4 border border-blue-100 text-blue-800 mb-8">
         <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3">
@@ -100,8 +125,7 @@ const ServicesPage = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Si hay servicios en la API, mostrarlos. De lo contrario, usar ejemplos */}
-              {(services?.length ? services : serviceExamples).map((service) => (
+              {displayServices.map((service) => (
                 <ServiceCard
                   key={service.id}
                   id={service.id}

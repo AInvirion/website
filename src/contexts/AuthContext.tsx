@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from "@/integrations/supabase/client";
@@ -31,37 +32,94 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserWithRole | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-
-      setUserFromSession(session);
-      setIsLoading(false);
-    };
-
-    getSession();
-
-    supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change event:', event);
-      setUserFromSession(session);
-    });
-  }, []);
+  const ensureUserProfile = async (userId: string, userData?: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    avatarUrl?: string;
+  }) => {
+    try {
+      // First check if profile exists
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .maybeSingle();
+      
+      // If there's no profile, create one
+      if (!existingProfile && !checkError) {
+        console.log('Creating new profile for user:', userId);
+        const { error: createError } = await supabase
+          .from('profiles')
+          .insert([{
+            id: userId,
+            email: userData?.email || '',
+            first_name: userData?.firstName || '',
+            last_name: userData?.lastName || '',
+            avatar_url: userData?.avatarUrl || '',
+            credits: 0
+          }]);
+          
+        if (createError) {
+          console.error('Error creating profile:', createError);
+        }
+      } else if (checkError && checkError.code !== 'PGRST116') {
+        // Only log real errors, not "no rows returned"
+        console.error('Error checking profile:', checkError);
+      }
+      
+      // Ensure user role exists
+      const { data: existingRole, error: roleCheckError } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+        
+      if (!existingRole && !roleCheckError) {
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert([{
+            user_id: userId,
+            role: 'usuario'
+          }]);
+          
+        if (roleError) {
+          console.error('Error creating user role:', roleError);
+        }
+      }
+    } catch (error) {
+      console.error('Error in ensureUserProfile:', error);
+    }
+  };
 
   const setUserFromSession = async (session: Session | null) => {
     if (session?.user) {
-      setIsAuthenticated(true);
       try {
+        // Ensure profile exists first
+        await ensureUserProfile(session.user.id, {
+          email: session.user.email,
+          firstName: session.user.user_metadata?.first_name,
+          lastName: session.user.user_metadata?.last_name,
+          avatarUrl: session.user.user_metadata?.avatar_url,
+        });
+        
+        // Then fetch profile
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (profileError) {
           console.error('Error fetching profile:', profileError);
-          setUser(null);
+          setUser({
+            ...session.user,
+            role: 'usuario'
+          });
+          setIsAuthenticated(true);
           return;
         }
 
@@ -69,7 +127,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .from('user_roles')
           .select('role')
           .eq('user_id', session.user.id)
-          .single();
+          .maybeSingle();
 
         if (roleError && roleError.code !== 'PGRST116') {
           console.error('Error fetching user role:', roleError);
@@ -85,16 +143,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         };
         
         setUser(userWithProfile);
+        setIsAuthenticated(true);
       } catch (error) {
         console.error('Error setting user from session:', error);
-        setUser(null);
+        // Still set user to avoid being locked out
+        setUser({
+          ...session.user,
+          role: 'usuario'
+        });
+        setIsAuthenticated(true);
       }
     } else {
       setIsAuthenticated(false);
       setUser(null);
     }
     setIsLoading(false);
+    setHasInitialized(true);
   };
+
+  useEffect(() => {
+    const getSession = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        await setUserFromSession(session);
+      } catch (error) {
+        console.error('Error getting session:', error);
+        setIsLoading(false);
+        setHasInitialized(true);
+      }
+    };
+
+    // Set up the auth state listener first
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Auth state change event:', event);
+      
+      // Process auth state changes only after initial setup
+      // or for sign-out which needs immediate processing
+      if (hasInitialized || event === 'SIGNED_OUT') {
+        await setUserFromSession(session);
+      }
+    });
+
+    // Then get the current session
+    getSession();
+
+    return () => subscription.unsubscribe();
+  }, [hasInitialized]);
 
   const signIn = async (email: string): Promise<void> => {
     setIsLoading(true);
@@ -145,26 +241,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
 
       if (data.user?.id) {
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert([
-            {
-              id: data.user.id,
-              first_name: firstName,
-              last_name: lastName,
-              email,
-              avatar_url: '',
-              credits: 0,
-              role: 'usuario',
-            },
-          ]);
-
-        if (profileError) {
-          console.error('Error creating profile:', profileError);
-          await signOut();
-          alert('Error creating profile: ' + profileError.message);
-          return;
-        }
+        await ensureUserProfile(data.user.id, {
+          email,
+          firstName,
+          lastName,
+          avatarUrl: '',
+        });
       }
 
       alert('Check your email for the verification link.');
@@ -182,6 +264,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      setUser(null);
+      setIsAuthenticated(false);
       navigate('/auth');
     } catch (error) {
       console.error('Error signing out:', error);
@@ -203,7 +287,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('profiles')
         .select('*')
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
         
       if (profileError) {
         console.error('Error fetching updated user data:', profileError);
@@ -214,7 +298,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('user_roles')
         .select('role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (roleError && roleError.code !== 'PGRST116') {
         console.error('Error fetching user role:', roleError);
@@ -222,7 +306,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (profile) {
         setUser(prevUser => ({
-          ...prevUser,
+          ...prevUser!,
           ...profile,
           role: userRole?.role || 'usuario'
         }));

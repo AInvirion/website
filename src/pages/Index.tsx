@@ -1,17 +1,34 @@
 
 import { Button } from "@/components/ui/button";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 
 const Index = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isLoading } = useAuth();
+  const navigate = useNavigate();
   
-  console.log("Index page - isAuthenticated:", isAuthenticated);
+  // Use an effect to handle navigation to prevent infinite redirects
+  useEffect(() => {
+    if (isAuthenticated && !isLoading) {
+      console.log("User is authenticated, navigating to /dashboard/servicios");
+      navigate("/dashboard/servicios", { replace: true });
+    }
+  }, [isAuthenticated, isLoading, navigate]);
 
-  // Redirect authenticated users directly to the services page
+  // Show loading state while checking authentication
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-lg">Cargando...</p>
+      </div>
+    );
+  }
+
+  // Prevent rendering the welcome content if user is authenticated
+  // This avoids flickering of content during redirect
   if (isAuthenticated) {
-    console.log("User is authenticated, redirecting to /dashboard/servicios");
-    return <Navigate to="/dashboard/servicios" />;
+    return null;
   }
 
   return (
