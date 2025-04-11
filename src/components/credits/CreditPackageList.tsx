@@ -6,11 +6,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { CreditPackage } from "@/types/credits";
 import { CreditPackageCard } from "./CreditPackageCard";
 import { useCreditPackages } from "@/hooks/useCreditPackages";
+import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 export function CreditPackageList() {
   const [isPurchasing, setIsPurchasing] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const { data: creditPackages, isLoading } = useCreditPackages();
+  const { user, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
   // Formatear precio en USD
   const formatPrice = (priceInCents: number): string => {
@@ -19,6 +23,17 @@ export function CreditPackageList() {
 
   // Función para iniciar el proceso de compra
   const handlePurchase = async (packageId: string) => {
+    // Verificar si el usuario está autenticado
+    if (!isAuthenticated || !user) {
+      console.log("Usuario no autenticado, redirigiendo a login");
+      toast("Es necesario iniciar sesión", {
+        description: "Debes iniciar sesión para comprar créditos",
+        className: "bg-blue-500"
+      });
+      navigate("/auth");
+      return;
+    }
+
     setSelectedPackage(packageId);
     setIsPurchasing(true);
 
@@ -27,6 +42,7 @@ export function CreditPackageList() {
       
       console.log("Iniciando proceso de compra para el paquete:", packageId);
       console.log("URL de origen:", origin);
+      console.log("Usuario autenticado:", user.id);
 
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {

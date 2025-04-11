@@ -68,13 +68,15 @@ serve(async (req) => {
     if (!stripeSecretKey) {
       console.error("STRIPE_SECRET_KEY not configured in environment");
       return new Response(
-        JSON.stringify({ error: "Error de configuración del servidor" }),
+        JSON.stringify({ error: "Error de configuración del servidor: Falta la clave secreta de Stripe" }),
         { 
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500 
         }
       );
     }
+    
+    console.log("Stripe key configured. Key starts with:", stripeSecretKey.substring(0, 7));
 
     const stripe = new Stripe(stripeSecretKey, {
       apiVersion: "2023-10-16",
@@ -231,7 +233,11 @@ serve(async (req) => {
     } catch (stripeError) {
       console.error("Stripe error creating checkout session:", stripeError);
       return new Response(
-        JSON.stringify({ error: "Error al crear la sesión de pago con Stripe", details: stripeError.message }),
+        JSON.stringify({ 
+          error: "Error al crear la sesión de pago con Stripe", 
+          details: stripeError.message,
+          errorObject: JSON.stringify(stripeError)
+        }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 500,
@@ -241,7 +247,11 @@ serve(async (req) => {
   } catch (error) {
     console.error("General error creating checkout session:", error);
     return new Response(
-      JSON.stringify({ error: "Error al crear la sesión de pago", details: error.message }),
+      JSON.stringify({ 
+        error: "Error al crear la sesión de pago", 
+        details: error.message,
+        errorObject: JSON.stringify(error)
+      }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 500,
