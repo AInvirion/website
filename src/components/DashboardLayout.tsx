@@ -20,8 +20,8 @@ export const DashboardLayout = () => {
 
   // Obtenemos las iniciales para el avatar
   const getInitials = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`;
+    if (user?.first_name && user?.last_name) {
+      return `${user.first_name.charAt(0)}${user.last_name.charAt(0)}`;
     }
     return user?.email?.charAt(0) || "U";
   };
@@ -36,11 +36,11 @@ export const DashboardLayout = () => {
         <div className="p-4">
           <div className="flex items-center space-x-2 mb-6">
             <Avatar>
-              <AvatarImage src={user?.avatarUrl || ""} />
+              <AvatarImage src={user?.avatar_url || ""} />
               <AvatarFallback>{getInitials()}</AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium">{user?.firstName} {user?.lastName}</p>
+              <p className="font-medium">{user?.first_name} {user?.last_name}</p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
           </div>

@@ -1,14 +1,10 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { supabase } from "@/integrations/supabase/client";
 import { User, Session } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
-import { AppRole } from '@/types/auth';
-
-type UserWithRole = Database['public']['Tables']['profiles']['Row'] & {
-  role?: AppRole;
-  credits?: number;
-};
+import { AppRole, UserWithRole } from '@/types/auth';
 
 interface AuthContextType {
   user: UserWithRole | null;
@@ -30,8 +26,6 @@ export const useAuth = () => {
   }
   return context;
 };
-
-const supabase = createClientComponentClient<Database>();
 
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<UserWithRole | null>(null);
@@ -70,12 +64,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUser(null);
         } else {
           const userWithProfile: UserWithRole = {
-            id: session.user.id,
-            email: session.user.email || '',
-            firstName: profile?.firstName || '',
-            lastName: profile?.lastName || '',
-            avatarUrl: profile?.avatarUrl || '',
-            role: profile?.role || 'user',
+            ...session.user,
+            first_name: profile?.first_name || '',
+            last_name: profile?.last_name || '',
+            avatar_url: profile?.avatar_url || '',
+            role: profile?.role || 'usuario',
             credits: profile?.credits || 0,
           };
           setUser(userWithProfile);
@@ -114,9 +107,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         password,
         options: {
           data: {
-            firstName,
-            lastName,
-            avatarUrl: '',
+            first_name: firstName,
+            last_name: lastName,
+            avatar_url: '',
           },
         },
       });
@@ -129,12 +122,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .insert([
             {
               id: data.user.id,
-              firstName,
-              lastName,
+              first_name: firstName,
+              last_name: lastName,
               email,
-              avatarUrl: '',
+              avatar_url: '',
               credits: 0,
-              role: 'user',
+              role: 'usuario',
             },
           ]);
 
@@ -212,7 +205,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     signUp,
     signOut,
     hasRole,
-    refreshUserData, // Add the new method to the context
+    refreshUserData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

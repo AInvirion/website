@@ -4,10 +4,10 @@ import { Session, User } from "@supabase/supabase-js";
 export type AppRole = "usuario" | "admin";
 
 export interface UserWithRole extends User {
-  roles?: AppRole[];
-  firstName?: string;
-  lastName?: string;
-  avatarUrl?: string;
+  role?: AppRole;
+  first_name?: string;
+  last_name?: string;
+  avatar_url?: string;
   credits?: number;
 }
 

@@ -6,7 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
 
 const Auth = () => {
-  const { signInWithGoogle, isAuthenticated, isLoading } = useAuth();
+  const { signIn, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -35,12 +35,12 @@ const Auth = () => {
 
         <div className="space-y-4">
           <Button
-            onClick={() => signInWithGoogle()}
+            onClick={() => signIn("example@email.com")}
             variant="outline"
             className="w-full flex items-center justify-center gap-2 py-6"
           >
             <FcGoogle className="w-5 h-5" />
-            <span>Iniciar sesión con Google</span>
+            <span>Iniciar sesión con Email</span>
           </Button>
         </div>
       </div>
