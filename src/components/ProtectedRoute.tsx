@@ -10,11 +10,11 @@ interface ProtectedRouteProps {
 
 export const ProtectedRoute = ({
   requiredRoles,
-  redirectTo = "/",
+  redirectTo = "/auth",
 }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading, hasRole } = useAuth();
 
-  // Mientras se carga, podríamos mostrar un spinner, pero por ahora retornamos null
+  // Mientras se carga, mostramos un spinner
   if (isLoading) {
     return <div className="flex items-center justify-center h-screen">Cargando...</div>;
   }
