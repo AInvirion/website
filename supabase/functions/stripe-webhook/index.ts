@@ -18,7 +18,7 @@ serve(async (req) => {
   const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
   
   if (!stripeSecretKey) {
-    console.error("⚠️ STRIPE_SECRET_KEY not configured in environment");
+    console.error("ERROR: STRIPE_SECRET_KEY not configured in environment");
     return new Response(
       JSON.stringify({ error: "STRIPE_SECRET_KEY missing in environment" }), 
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -26,7 +26,7 @@ serve(async (req) => {
   }
   
   if (!endpointSecret) {
-    console.error("⚠️ STRIPE_WEBHOOK_SECRET not configured in environment");
+    console.error("ERROR: STRIPE_WEBHOOK_SECRET not configured in environment");
     return new Response(
       JSON.stringify({ error: "STRIPE_WEBHOOK_SECRET missing in environment" }), 
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -41,7 +41,7 @@ serve(async (req) => {
     const signature = req.headers.get("stripe-signature");
 
     if (!signature) {
-      console.error("⚠️ No Stripe signature found");
+      console.error("ERROR: No Stripe signature found");
       return new Response(JSON.stringify({ error: "No Stripe signature found" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -49,15 +49,15 @@ serve(async (req) => {
     }
 
     const body = await req.text();
-    console.log("📩 Received webhook with payload size:", body.length);
-    console.log("📩 Signature:", signature.substring(0, 20) + "...");
+    console.log("INFO: Received webhook with payload size:", body.length);
+    console.log("INFO: Signature:", signature.substring(0, 20) + "...");
     
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") || "";
     
     if (!supabaseUrl || !supabaseAnonKey) {
-      console.error("⚠️ Supabase credentials missing");
+      console.error("ERROR: Supabase credentials missing");
       return new Response(JSON.stringify({ error: "Supabase configuration missing" }), { 
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -68,9 +68,9 @@ serve(async (req) => {
     
     let event;
     
-    // Verify webhook signature - CAMBIO CRUCIAL: usar constructEventAsync en lugar de constructEvent
+    // Verify webhook signature
     try {
-      console.log("🔐 Verifying webhook signature with secret:", 
+      console.log("INFO: Verifying webhook signature with secret:", 
         endpointSecret.substring(0, 10) + "...");
       
       // Usar la versión asíncrona de constructEvent
@@ -79,9 +79,9 @@ serve(async (req) => {
         signature,
         endpointSecret
       );
-      console.log("✅ Webhook signature verified successfully");
+      console.log("SUCCESS: Webhook signature verified successfully");
     } catch (err) {
-      console.error(`⚠️ Webhook signature verification failed:`, err.message);
+      console.error(`ERROR: Webhook signature verification failed:`, err.message);
       return new Response(JSON.stringify({ error: `Webhook Error: ${err.message}` }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -90,12 +90,12 @@ serve(async (req) => {
 
     // Get session object
     const session = event.data.object;
-    console.log(`🔄 Processing event ${event.type} for session ${session.id}`);
+    console.log(`INFO: Processing event ${event.type} for session ${session.id}`);
     
     if (session.metadata) {
-      console.log(`📝 Session metadata:`, JSON.stringify(session.metadata));
+      console.log(`INFO: Session metadata:`, JSON.stringify(session.metadata));
     } else {
-      console.warn("⚠️ No metadata found in session");
+      console.warn("WARNING: No metadata found in session");
     }
 
     // Handle different event types
@@ -117,7 +117,7 @@ serve(async (req) => {
         break;
         
       default:
-        console.log(`ℹ️ Event not handled: ${event.type}`);
+        console.log(`INFO: Event not handled: ${event.type}`);
     }
 
     // Return a response to acknowledge receipt of the event
@@ -126,7 +126,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error(`❌ Error processing webhook: ${err.message}`);
+    console.error(`ERROR: Error processing webhook: ${err.message}`);
     console.error("Error stack:", err.stack);
     return new Response(JSON.stringify({ error: `Webhook error: ${err.message}` }), {
       status: 500,
@@ -140,12 +140,12 @@ serve(async (req) => {
 // Handle checkout.session.completed
 async function handleCheckoutSessionCompleted(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
-    console.error("❌ No user ID in metadata");
+    console.error("ERROR: No user ID in metadata");
     return;
   }
 
   const userId = session.metadata.user_id;
-  console.log(`🧑 Processing for user: ${userId}`);
+  console.log(`INFO: Processing for user: ${userId}`);
   
   try {
     // Process based on purchase type
@@ -153,7 +153,7 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
       const credits = Number(session.metadata.credits) || 0;
       
       if (credits > 0) {
-        console.log(`💰 Adding ${credits} credits for user ${userId}`);
+        console.log(`INFO: Adding ${credits} credits for user ${userId}`);
         
         // Register the credit transaction
         const { data: transactionData, error: transactionError } = await supabaseClient
@@ -167,12 +167,12 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
           .select();
           
         if (transactionError) {
-          console.error(`❌ Error registering transaction: ${transactionError.message}`);
+          console.error(`ERROR: Error registering transaction: ${transactionError.message}`);
           console.error("Transaction error details:", JSON.stringify(transactionError));
           throw transactionError;
         }
         
-        console.log(`✅ Transaction registered: ${transactionData?.[0]?.id || 'unknown ID'}`);
+        console.log(`SUCCESS: Transaction registered: ${transactionData?.[0]?.id || 'unknown ID'}`);
         
         // Verificar el saldo actual del usuario para diagnóstico
         const { data: userData, error: userError } = await supabaseClient
@@ -182,9 +182,9 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
           .single();
         
         if (userError) {
-          console.error(`❌ Error checking user credits: ${userError.message}`);
+          console.error(`ERROR: Error checking user credits: ${userError.message}`);
         } else {
-          console.log(`ℹ️ User credits before update: ${userData?.credits || 0}`);
+          console.log(`INFO: User credits before update: ${userData?.credits || 0}`);
         }
         
         // El gatillo de base de datos update_user_credits debe actualizar los créditos automáticamente
@@ -198,13 +198,13 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
           .single();
         
         if (updatedUserError) {
-          console.error(`❌ Error checking updated user credits: ${updatedUserError.message}`);
+          console.error(`ERROR: Error checking updated user credits: ${updatedUserError.message}`);
         } else {
-          console.log(`ℹ️ User credits after update: ${updatedUserData?.credits || 0}`);
+          console.log(`INFO: User credits after update: ${updatedUserData?.credits || 0}`);
           
           // Si los créditos no se actualizaron, intentamos actualizarlos manualmente
           if (updatedUserData?.credits === userData?.credits) {
-            console.log(`⚠️ Credits not updated by trigger, updating manually`);
+            console.log(`WARNING: Credits not updated by trigger, updating manually`);
             
             const { error: updateError } = await supabaseClient
               .from("profiles")
@@ -212,9 +212,9 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
               .eq("id", userId);
             
             if (updateError) {
-              console.error(`❌ Error updating credits manually: ${updateError.message}`);
+              console.error(`ERROR: Error updating credits manually: ${updateError.message}`);
             } else {
-              console.log(`✅ Credits updated manually: ${credits} added to user ${userId}`);
+              console.log(`SUCCESS: Credits updated manually: ${credits} added to user ${userId}`);
             }
           }
         }
@@ -222,7 +222,7 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
     } 
     else if (session.metadata.type === "direct_service") {
       // Implement logic to process the direct payment for a service
-      console.log(`✅ Direct payment for service ${session.metadata.service_id} for user ${userId}`);
+      console.log(`INFO: Direct payment for service ${session.metadata.service_id} for user ${userId}`);
       
       try {
         // Register the service execution as "paid"
@@ -237,18 +237,18 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
           .select();
           
         if (serviceError) {
-          console.error(`❌ Error registering service execution: ${serviceError.message}`);
+          console.error(`ERROR: Error registering service execution: ${serviceError.message}`);
           console.error("Service error details:", JSON.stringify(serviceError));
           throw serviceError;
         }
         
-        console.log(`✅ Service execution registered: ${serviceData?.[0]?.id || 'unknown ID'}`);
+        console.log(`SUCCESS: Service execution registered: ${serviceData?.[0]?.id || 'unknown ID'}`);
       } catch (error) {
-        console.error(`❌ Error processing service payment: ${error.message}`);
+        console.error(`ERROR: Error processing service payment: ${error.message}`);
       }
     }
   } catch (error) {
-    console.error(`❌ Error in handleCheckoutSessionCompleted: ${error.message}`);
+    console.error(`ERROR: Error in handleCheckoutSessionCompleted: ${error.message}`);
     console.error("Error details:", JSON.stringify(error));
     // We don't re-throw here to avoid failing the webhook overall
   }
@@ -256,18 +256,18 @@ async function handleCheckoutSessionCompleted(session, supabaseClient) {
 
 // Handle checkout.session.async_payment_succeeded
 async function handleAsyncPaymentSucceeded(session, supabaseClient) {
-  console.log(`💰 Async payment success: ${session.id}`);
+  console.log(`INFO: Async payment success: ${session.id}`);
   await handleCheckoutSessionCompleted(session, supabaseClient);
 }
 
 async function handleAsyncPaymentFailed(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
-    console.error("❌ No user ID in metadata");
+    console.error("ERROR: No user ID in metadata");
     return;
   }
 
   const userId = session.metadata.user_id;
-  console.log(`❌ Async payment failed for user ${userId}`);
+  console.log(`ERROR: Async payment failed for user ${userId}`);
 
   try {
     // Register the failed payment
@@ -281,23 +281,23 @@ async function handleAsyncPaymentFailed(session, supabaseClient) {
       });
       
     if (error) {
-      console.error(`❌ Error registering payment failure: ${error.message}`);
+      console.error(`ERROR: Error registering payment failure: ${error.message}`);
       console.error("Error details:", JSON.stringify(error));
     }
   } catch (error) {
-    console.error(`❌ Error in handleAsyncPaymentFailed: ${error.message}`);
+    console.error(`ERROR: Error in handleAsyncPaymentFailed: ${error.message}`);
     console.error("Error details:", JSON.stringify(error));
   }
 }
 
 async function handleCheckoutSessionExpired(session, supabaseClient) {
   if (!session.metadata || !session.metadata.user_id) {
-    console.error("❌ No user ID in metadata");
+    console.error("ERROR: No user ID in metadata");
     return;
   }
 
   const userId = session.metadata.user_id;
-  console.log(`⏱️ Payment session expired for user ${userId}`);
+  console.log(`INFO: Payment session expired for user ${userId}`);
 
   try {
     // Register the session expiration
@@ -311,11 +311,11 @@ async function handleCheckoutSessionExpired(session, supabaseClient) {
       });
       
     if (error) {
-      console.error(`❌ Error registering session expiration: ${error.message}`);
+      console.error(`ERROR: Error registering session expiration: ${error.message}`);
       console.error("Error details:", JSON.stringify(error));
     }
   } catch (error) {
-    console.error(`❌ Error in handleCheckoutSessionExpired: ${error.message}`);
+    console.error(`ERROR: Error in handleCheckoutSessionExpired: ${error.message}`);
     console.error("Error details:", JSON.stringify(error));
   }
 }
