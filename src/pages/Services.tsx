@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { ServiceCard } from "@/components/ServiceCard";
 import { Loader2, Plus } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AIChatWidget } from "@/components/AIChatWidget";
 
 interface Service {
   id: string;
@@ -85,25 +86,33 @@ const ServicesPage = () => {
         </div>
       </div>
       
-      {isLoading ? (
-        <div className="flex justify-center py-12">
-          <Loader2 className="animate-spin h-8 w-8 text-primary" />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          {isLoading ? (
+            <div className="flex justify-center py-12">
+              <Loader2 className="animate-spin h-8 w-8 text-primary" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Si hay servicios en la API, mostrarlos. De lo contrario, usar ejemplos */}
+              {(services?.length ? services : serviceExamples).map((service) => (
+                <ServiceCard
+                  key={service.id}
+                  id={service.id}
+                  name={service.name}
+                  description={service.description}
+                  price={service.price}
+                  features={service.features || []}
+                />
+              ))}
+            </div>
+          )}
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {/* Si hay servicios en la API, mostrarlos. De lo contrario, usar ejemplos */}
-          {(services?.length ? services : serviceExamples).map((service) => (
-            <ServiceCard
-              key={service.id}
-              id={service.id}
-              name={service.name}
-              description={service.description}
-              price={service.price}
-              features={service.features || []}
-            />
-          ))}
+        
+        <div className="lg:col-span-1">
+          <AIChatWidget />
         </div>
-      )}
+      </div>
     </div>
   );
 };

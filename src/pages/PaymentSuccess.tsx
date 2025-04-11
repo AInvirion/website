@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Check, ChevronRight, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { CreditTransaction } from "@/types/credits";
 
 const PaymentSuccess = () => {
   const [searchParams] = useSearchParams();
@@ -40,7 +41,7 @@ const PaymentSuccess = () => {
   };
 
   // Query for recent transaction associated with this session ID or just the most recent one
-  const { data: recentTransaction, isLoading, refetch } = useQuery({
+  const { data: recentTransaction, isLoading, refetch } = useQuery<CreditTransaction>({
     queryKey: ["recent-transaction", user?.id, sessionId, retries],
     queryFn: async () => {
       if (!user?.id) return null;
@@ -67,7 +68,7 @@ const PaymentSuccess = () => {
       }
       
       if (error) throw error;
-      return data;
+      return data as CreditTransaction;
     },
     enabled: !!user?.id && !isVerifying,
     refetchInterval: recentTransaction ? false : 5000, // Poll every 5 seconds until we find a transaction

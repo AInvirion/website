@@ -1,10 +1,15 @@
 
 import { Button } from "@/components/ui/button";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const { isAuthenticated } = useAuth();
+
+  // Redirect authenticated users directly to the services page
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard/servicios" />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100">
@@ -15,15 +20,9 @@ const Index = () => {
         </p>
         
         <div className="space-x-4">
-          {isAuthenticated ? (
-            <Button asChild size="lg">
-              <Link to="/dashboard">Ir al Dashboard</Link>
-            </Button>
-          ) : (
-            <Button asChild size="lg">
-              <Link to="/auth">Iniciar Sesión</Link>
-            </Button>
-          )}
+          <Button asChild size="lg">
+            <Link to="/auth">Iniciar Sesión</Link>
+          </Button>
         </div>
       </div>
     </div>

@@ -195,6 +195,7 @@ export type Database = {
           amount: number
           created_at: string | null
           id: string
+          reference_id: string | null
           type: string
           user_id: string | null
         }
@@ -202,6 +203,7 @@ export type Database = {
           amount: number
           created_at?: string | null
           id?: string
+          reference_id?: string | null
           type: string
           user_id?: string | null
         }
@@ -209,6 +211,7 @@ export type Database = {
           amount?: number
           created_at?: string | null
           id?: string
+          reference_id?: string | null
           type?: string
           user_id?: string | null
         }
