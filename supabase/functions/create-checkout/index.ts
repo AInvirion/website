@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.1";
 import Stripe from "https://esm.sh/stripe@14.21.0";
@@ -119,7 +120,7 @@ serve(async (req) => {
   }
 
   try {
-    const { action, sessionId, userId, packageId, serviceId, price, mode } = await req.json();
+    const { action, sessionId, userId, packageId, serviceId, price, origin, checkoutType } = await req.json();
 
     // Get secret keys from Supabase
     const stripeSecretKey = Deno.env.get("STRIPE_SECRET_KEY");
@@ -155,11 +156,142 @@ serve(async (req) => {
       );
     }
 
-    // El resto del código existente para crear sesiones de checkout...
-    // (Asumiendo que hay más código aquí)
+    // Extraer JWT del encabezado de autorización
+    const authHeader = req.headers.get('authorization');
+    let userId;
+
+    if (authHeader) {
+      try {
+        const jwt = authHeader.split(' ')[1];
+        const { data: { user }, error } = await supabaseAdmin.auth.getUser(jwt);
+        
+        if (error || !user) {
+          throw new Error("Usuario no autenticado");
+        }
+        
+        userId = user.id;
+        console.log("Usuario autenticado:", userId);
+      } catch (error) {
+        console.error("Error al verificar JWT:", error);
+        throw new Error("Error de autenticación");
+      }
+    } else {
+      throw new Error("No se proporcionó token de autenticación");
+    }
+
+    // Crear sesión de checkout según el tipo
+    if (checkoutType === "package" && packageId) {
+      console.log(`Creando sesión de checkout para paquete: ${packageId}`);
+      
+      // Obtener información del paquete
+      const { data: packageData, error: packageError } = await supabaseAdmin
+        .from("credit_packages")
+        .select("*")
+        .eq("id", packageId)
+        .single();
+      
+      if (packageError || !packageData) {
+        console.error("Error al obtener el paquete:", packageError);
+        throw new Error("No se pudo obtener información del paquete");
+      }
+      
+      console.log("Paquete encontrado:", packageData);
+      
+      // Crear sesión de checkout
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: packageData.name,
+                description: `${packageData.credits} créditos`,
+              },
+              unit_amount: packageData.price,  // Precio en centavos
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${origin}/dashboard/creditos/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/dashboard/creditos`,
+        metadata: {
+          user_id: userId,
+          type: "credit_package",
+          credits: packageData.credits.toString(),
+        },
+      });
+      
+      console.log("Sesión de checkout creada:", session.id);
+      
+      return new Response(
+        JSON.stringify({ url: session.url }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    } 
+    else if (checkoutType === "service" && serviceId) {
+      console.log(`Creando sesión de checkout para servicio: ${serviceId}`);
+      
+      // Obtener información del servicio
+      const { data: serviceData, error: serviceError } = await supabaseAdmin
+        .from("services")
+        .select("*")
+        .eq("id", serviceId)
+        .single();
+      
+      if (serviceError || !serviceData) {
+        console.error("Error al obtener el servicio:", serviceError);
+        throw new Error("No se pudo obtener información del servicio");
+      }
+      
+      console.log("Servicio encontrado:", serviceData);
+      
+      // Convertir precio de créditos a dólares (4 dólares por crédito)
+      const priceInCents = serviceData.price * 400;  // $4.00 = 400 centavos por crédito
+      
+      // Crear sesión de checkout
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        line_items: [
+          {
+            price_data: {
+              currency: "usd",
+              product_data: {
+                name: serviceData.name,
+                description: serviceData.description || "Servicio premium",
+              },
+              unit_amount: priceInCents,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${origin}/dashboard/servicios/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${origin}/dashboard/servicios`,
+        metadata: {
+          user_id: userId,
+          type: "direct_service",
+          service_id: serviceId,
+        },
+      });
+      
+      console.log("Sesión de checkout creada:", session.id);
+      
+      return new Response(
+        JSON.stringify({ url: session.url }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
 
     return new Response(
-      JSON.stringify({ error: "Acción no soportada" }),
+      JSON.stringify({ error: "Tipo de checkout no soportado o datos incompletos" }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,

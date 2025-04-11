@@ -167,17 +167,17 @@ const ServicePayment = () => {
       
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>{service.name}</CardTitle>
-          <CardDescription>{service.description}</CardDescription>
+          <CardTitle>{service?.name}</CardTitle>
+          <CardDescription>{service?.description}</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex justify-between items-center">
             <div>
               <p className="text-lg font-medium">Precio:</p>
               <div className="flex items-center gap-4 mt-1">
-                <p className="text-2xl font-bold">{service.price} créditos</p>
+                <p className="text-2xl font-bold">{service?.price} créditos</p>
                 <p className="text-gray-500">o</p>
-                <p className="text-xl font-bold">${(service.price * 4).toFixed(2)} USD</p>
+                <p className="text-xl font-bold">${service ? (service.price * 4).toFixed(2) : '0.00'} USD</p>
               </div>
             </div>
             <div className="text-right">
