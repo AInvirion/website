@@ -5,9 +5,9 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Service } from "@/types/service";
-import { User } from "@/types/auth";
+import { UserWithRole } from "@/types/auth";
 
-export function useServicePayment(serviceId: string | undefined, user: User | null) {
+export function useServicePayment(serviceId: string | undefined, user: UserWithRole | null) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"credits" | "stripe">("credits");
   const navigate = useNavigate();

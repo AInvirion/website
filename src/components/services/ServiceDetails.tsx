@@ -1,11 +1,11 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Service } from "@/types/service";
-import { User } from "@/types/auth";
+import { UserWithRole } from "@/types/auth";
 
 interface ServiceDetailsProps {
   service: Service;
-  user: User | null;
+  user: UserWithRole | null;
   hasSufficientCredits: boolean;
 }
 
