@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +23,6 @@ const ServicePayment = () => {
   const [paymentMethod, setPaymentMethod] = useState<"credits" | "stripe">("credits");
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Obtener datos del servicio
   const { data: service, isLoading } = useQuery({
     queryKey: ["service", serviceId],
     queryFn: async () => {
@@ -42,12 +40,10 @@ const ServicePayment = () => {
     enabled: !!serviceId,
   });
 
-  // Verificar si el usuario tiene suficientes créditos
   const hasSufficientCredits = user?.credits && service?.price 
     ? user.credits >= service.price
     : false;
 
-  // Manejar pago con créditos
   const handleCreditPayment = async () => {
     if (!service || !user?.id) return;
     
@@ -62,19 +58,17 @@ const ServicePayment = () => {
     setIsProcessing(true);
     
     try {
-      // Registrar transacción de créditos (negativa para consumo)
       const { error: transactionError } = await supabase
         .from("credit_transactions")
         .insert({
           user_id: user.id,
-          amount: -service.price, // Negativo para indicar consumo
+          amount: -service.price,
           type: "service_payment",
           reference_id: service.id,
         });
 
       if (transactionError) throw transactionError;
 
-      // Registrar la ejecución del servicio
       const { error: executionError } = await supabase
         .from("service_executions")
         .insert({
@@ -86,13 +80,11 @@ const ServicePayment = () => {
 
       if (executionError) throw executionError;
 
-      // Mostrar mensaje de éxito
       toast("Pago con créditos completado", {
         description: `Has utilizado ${service.price} créditos para este servicio`,
         className: "bg-green-500"
       });
 
-      // Redirigir al usuario
       navigate("/dashboard/historial");
       
     } catch (error) {
@@ -106,7 +98,6 @@ const ServicePayment = () => {
     }
   };
 
-  // Manejar pago con Stripe
   const handleStripePayment = async () => {
     if (!service || !user?.id) return;
     
@@ -114,6 +105,12 @@ const ServicePayment = () => {
     
     try {
       const origin = window.location.origin;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No se pudo obtener la sesión de autenticación");
+      }
 
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
@@ -123,12 +120,16 @@ const ServicePayment = () => {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error al invocar la función create-checkout:", error);
+        throw error;
+      }
 
-      // Redirigir a la URL de checkout de Stripe
       if (data?.url) {
+        console.log("URL de checkout de Stripe recibida:", data.url);
         window.location.href = data.url;
       } else {
+        console.error("No se recibió URL de checkout en la respuesta:", data);
         throw new Error("No se pudo crear la sesión de pago");
       }
     } catch (error) {

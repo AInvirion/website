@@ -44,6 +44,13 @@ export function CreditPackageList() {
       console.log("URL de origen:", origin);
       console.log("Usuario autenticado:", user.id);
 
+      // Obtener el token de sesión actual
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        throw new Error("No se pudo obtener la sesión de autenticación");
+      }
+
       const { data, error } = await supabase.functions.invoke("create-checkout", {
         body: {
           checkoutType: "package",
