@@ -1,13 +1,44 @@
 
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { FcGoogle } from "react-icons/fc";
+import { Input } from "@/components/ui/input";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
+
+const loginSchema = z.object({
+  email: z.string().email("Ingresa un correo electrónico válido"),
+});
+
+type LoginFormValues = z.infer<typeof loginSchema>;
 
 const Auth = () => {
   const { signIn, isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
+  const [error, setError] = useState<string | null>(null);
+
+  // Login form using react-hook-form
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: {
+      email: "",
+    },
+  });
+
+  const onSubmit = async (data: LoginFormValues) => {
+    setError(null);
+    try {
+      await signIn(data.email);
+    } catch (err: any) {
+      setError(err.message || "Ocurrió un error al iniciar sesión");
+    }
+  };
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -33,16 +64,49 @@ const Auth = () => {
           </p>
         </div>
 
-        <div className="space-y-4">
-          <Button
-            onClick={() => signIn("example@email.com")}
-            variant="outline"
-            className="w-full flex items-center justify-center gap-2 py-6"
-          >
-            <FcGoogle className="w-5 h-5" />
-            <span>Iniciar sesión con Email</span>
-          </Button>
-        </div>
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Correo Electrónico</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="tu@correo.com"
+                      {...field}
+                      type="email"
+                      autoComplete="email"
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 py-6"
+              disabled={form.formState.isSubmitting}
+            >
+              {form.formState.isSubmitting ? (
+                "Enviando..."
+              ) : (
+                <>
+                  <span>Iniciar sesión con Email</span>
+                </>
+              )}
+            </Button>
+          </form>
+        </Form>
       </div>
     </div>
   );
