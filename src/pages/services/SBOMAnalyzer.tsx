@@ -1,9 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { File, Upload, Check, X, Loader2 } from "lucide-react";
+import { File, Upload, Check, X, Loader2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -180,214 +179,263 @@ const SBOMAnalyzer = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Análisis de SBOM</h1>
+    <div className="flex flex-col min-h-screen">
+      <div className="relative bg-blue-600 text-white">
+        <div className="absolute inset-0 bg-[url('/lovable-uploads/3e609b0b-0b53-4606-89ef-af0c2fcc30aa.png')] bg-cover bg-center opacity-20" />
+        <div className="relative container mx-auto px-4 py-16 sm:py-24">
+          <Button
+            variant="ghost"
+            className="mb-8 text-white hover:text-white/80"
+            onClick={() => navigate('/dashboard/servicios')}
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Volver a servicios
+          </Button>
+          <h1 className="text-4xl sm:text-5xl font-bold mb-4">
+            Análisis SBOM de Código
+          </h1>
+          <p className="text-xl text-white/90 max-w-3xl">
+            Verifica el cumplimiento legal de las librerías utilizadas en tu software mediante el
+            análisis de archivos SBOM (JSON).
+          </p>
+        </div>
       </div>
-      
-      {/* Progress bar */}
-      <div className="w-full bg-gray-200 h-2 rounded-full mb-8">
-        <div 
-          className="bg-purple-600 h-2 rounded-full transition-all"
-          style={{ width: `${(currentStep / 2) * 100}%` }}
-        />
-      </div>
-      
-      {currentStep === SBOMStep.FILE_UPLOAD && (
-        <Card className="max-w-2xl mx-auto transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Paso 1 de 2</CardTitle>
-            <CardDescription>
-              Sube tu archivo SBOM en formato JSON para análisis de cumplimiento legal.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Form {...form}>
-              <form onSubmit={form.handleSubmit(onFormSubmit)} className="space-y-6">
-                {/* File upload area */}
-                <div className="space-y-2">
-                  <Label htmlFor="sbom-file">Archivo SBOM (JSON)</Label>
-                  
-                  <div
-                    onDragOver={handleDragOver}
-                    onDrop={handleFileDrop}
-                    className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
-                  >
-                    <input
-                      id="sbom-file"
-                      type="file"
-                      accept=".json,application/json"
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    
-                    {!sbomData.file ? (
-                      <label htmlFor="sbom-file" className="cursor-pointer">
-                        <File className="mx-auto h-12 w-12 text-gray-400" />
-                        <p className="mt-2 text-sm text-gray-600">
-                          Arrastra y suelta tu archivo aquí o{" "}
-                          <span className="text-purple-600 hover:underline">
-                            haz clic para seleccionar
-                          </span>
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Solo archivos JSON
-                        </p>
-                      </label>
-                    ) : (
-                      <div className="text-center">
-                        <File className="mx-auto h-12 w-12 text-green-500" />
-                        <p className="mt-2 text-sm text-green-600 font-medium">
-                          {sbomData.file.name}
-                        </p>
+
+      <div className="container mx-auto px-4 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            {currentStep === SBOMStep.FILE_UPLOAD && (
+              <Card className="max-w-2xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle>Paso 1 de 2</CardTitle>
+                  <CardDescription>
+                    Sube tu archivo SBOM en formato JSON para análisis de cumplimiento legal.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onFormSubmit)} className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="sbom-file">Archivo SBOM (JSON)</Label>
+                        
+                        <div
+                          onDragOver={handleDragOver}
+                          onDrop={handleFileDrop}
+                          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer bg-gray-50 hover:bg-gray-100 transition-colors"
+                        >
+                          <input
+                            id="sbom-file"
+                            type="file"
+                            accept=".json,application/json"
+                            onChange={handleFileUpload}
+                            className="hidden"
+                          />
+                          
+                          {!sbomData.file ? (
+                            <label htmlFor="sbom-file" className="cursor-pointer">
+                              <File className="mx-auto h-12 w-12 text-gray-400" />
+                              <p className="mt-2 text-sm text-gray-600">
+                                Arrastra y suelta tu archivo aquí o{" "}
+                                <span className="text-purple-600 hover:underline">
+                                  haz clic para seleccionar
+                                </span>
+                              </p>
+                              <p className="mt-1 text-xs text-gray-500">
+                                Solo archivos JSON
+                              </p>
+                            </label>
+                          ) : (
+                            <div className="text-center">
+                              <File className="mx-auto h-12 w-12 text-green-500" />
+                              <p className="mt-2 text-sm text-green-600 font-medium">
+                                {sbomData.file.name}
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSbomData({ ...sbomData, file: null })}
+                                className="mt-2"
+                              >
+                                <X className="h-4 w-4 mr-1" /> Eliminar
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="text-sm font-medium">Enviar resultados a:</div>
+                        
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <Button
+                            type="button"
+                            variant={sbomData.useDefaultEmail ? "default" : "outline"}
+                            size="sm"
+                            className="justify-start"
+                            onClick={() => toggleEmailType(true)}
+                          >
+                            <Check className={`h-4 w-4 mr-2 ${sbomData.useDefaultEmail ? 'opacity-100' : 'opacity-0'}`} />
+                            Usar email de sesión ({user?.email})
+                          </Button>
+                          
+                          <Button
+                            type="button"
+                            variant={!sbomData.useDefaultEmail ? "default" : "outline"}
+                            size="sm"
+                            className="justify-start"
+                            onClick={() => toggleEmailType(false)}
+                          >
+                            <Check className={`h-4 w-4 mr-2 ${!sbomData.useDefaultEmail ? 'opacity-100' : 'opacity-0'}`} />
+                            Usar otro email
+                          </Button>
+                        </div>
+                        
+                        {!sbomData.useDefaultEmail && (
+                          <FormField
+                            control={form.control}
+                            name="email"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Email</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="correo@ejemplo.com" 
+                                    {...field} 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                        )}
+                      </div>
+                      
+                      <div className="mt-8 flex justify-between">
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
-                          onClick={() => setSbomData({ ...sbomData, file: null })}
-                          className="mt-2"
+                          onClick={() => navigate('/dashboard/servicios')}
                         >
-                          <X className="h-4 w-4 mr-1" /> Eliminar
+                          Cancelar
+                        </Button>
+                        <Button type="submit">
+                          Siguiente
                         </Button>
                       </div>
-                    )}
+                    </form>
+                  </Form>
+                </CardContent>
+              </Card>
+            )}
+            
+            {currentStep === SBOMStep.CONFIRMATION && (
+              <Card className="max-w-2xl transition-all duration-300">
+                <CardHeader>
+                  <CardTitle>Paso 2 de 2</CardTitle>
+                  <CardDescription>
+                    Confirma los detalles de tu solicitud de análisis.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="bg-gray-50 rounded-lg p-6 mb-6">
+                    <div className="space-y-3">
+                      <div className="flex flex-col sm:flex-row justify-between">
+                        <span className="font-medium text-gray-700">Archivo SBOM:</span>
+                        <span className="text-gray-900">{sbomData.file?.name}</span>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row justify-between">
+                        <span className="font-medium text-gray-700">Email para resultados:</span>
+                        <span className="text-gray-900">{sbomData.useDefaultEmail ? user?.email : sbomData.email}</span>
+                      </div>
+                      
+                      <div className="flex flex-col sm:flex-row justify-between pt-3 border-t">
+                        <span className="font-medium text-gray-700">Costo:</span>
+                        <span className="text-gray-900 font-bold">8 créditos</span>
+                      </div>
+                    </div>
+                    
+                    <p className="mt-4 text-sm text-gray-600">
+                      Te enviaremos los resultados del análisis a la dirección de correo electrónico indicada tan pronto como estén disponibles.
+                    </p>
                   </div>
-                </div>
-                
-                {/* Email selection */}
-                <div className="space-y-4">
-                  <div className="text-sm font-medium">Enviar resultados a:</div>
                   
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <Button
-                      type="button"
-                      variant={sbomData.useDefaultEmail ? "default" : "outline"}
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => toggleEmailType(true)}
-                    >
-                      <Check className={`h-4 w-4 mr-2 ${sbomData.useDefaultEmail ? 'opacity-100' : 'opacity-0'}`} />
-                      Usar email de sesión ({user?.email})
+                  <div className="mt-8 flex flex-col sm:flex-row justify-between gap-3">
+                    <Button variant="outline" onClick={goToPreviousStep}>
+                      Anterior
                     </Button>
                     
-                    <Button
-                      type="button"
-                      variant={!sbomData.useDefaultEmail ? "default" : "outline"}
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => toggleEmailType(false)}
-                    >
-                      <Check className={`h-4 w-4 mr-2 ${!sbomData.useDefaultEmail ? 'opacity-100' : 'opacity-0'}`} />
-                      Usar otro email
-                    </Button>
+                    <div className="flex gap-3">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => navigate('/dashboard/servicios')}
+                      >
+                        Cancelar
+                      </Button>
+                      <Button 
+                        onClick={handleSubmit}
+                        disabled={loading}
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Procesando
+                          </>
+                        ) : (
+                          <>
+                            <Check className="mr-2 h-4 w-4" />
+                            Confirmar y procesar
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
-                  
-                  {!sbomData.useDefaultEmail && (
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input 
-                              placeholder="correo@ejemplo.com" 
-                              {...field} 
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <File className="h-5 w-5 text-purple-600" />
+                  Análisis SBOM de Código
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 mb-4">
+                  Verifica el cumplimiento legal de las librerías utilizadas en tu software mediante el análisis 
+                  de archivos SBOM (JSON).
+                </p>
+                <div className="bg-purple-50 rounded-lg p-4 mb-4">
+                  <h3 className="font-medium text-purple-900 mb-2">¿Qué es un archivo SBOM?</h3>
+                  <p className="text-sm text-purple-800">
+                    Un Software Bill of Materials (SBOM) es un inventario detallado de todos los componentes 
+                    utilizados en tu software, incluyendo dependencias, versiones y licencias. Es esencial 
+                    para gestionar riesgos legales y de seguridad.
+                  </p>
                 </div>
-                
-                {/* Navigation buttons */}
-                <div className="mt-8 flex justify-between">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => navigate('/dashboard/servicios')}
+                <div className="space-y-4">
+                  <h3 className="font-medium text-gray-900">¿Necesitas ayuda?</h3>
+                  <p className="text-sm text-gray-600">
+                    Nuestro equipo está disponible para resolver tus dudas y proporcionarte más información 
+                    sobre este servicio.
+                  </p>
+                  <a 
+                    href="mailto:info@empresa.com" 
+                    className="text-sm text-purple-600 hover:text-purple-700 flex items-center gap-1"
                   >
-                    Cancelar
-                  </Button>
-                  <Button type="submit">
-                    Siguiente
-                  </Button>
+                    <Mail className="h-4 w-4" />
+                    info@empresa.com
+                  </a>
                 </div>
-              </form>
-            </Form>
-          </CardContent>
-        </Card>
-      )}
-      
-      {currentStep === SBOMStep.CONFIRMATION && (
-        <Card className="max-w-2xl mx-auto transition-all duration-300">
-          <CardHeader>
-            <CardTitle>Paso 2 de 2</CardTitle>
-            <CardDescription>
-              Confirma los detalles de tu solicitud de análisis.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {/* Summary information */}
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row justify-between">
-                  <span className="font-medium text-gray-700">Archivo SBOM:</span>
-                  <span className="text-gray-900">{sbomData.file?.name}</span>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row justify-between">
-                  <span className="font-medium text-gray-700">Email para resultados:</span>
-                  <span className="text-gray-900">{sbomData.useDefaultEmail ? user?.email : sbomData.email}</span>
-                </div>
-                
-                <div className="flex flex-col sm:flex-row justify-between pt-3 border-t">
-                  <span className="font-medium text-gray-700">Costo:</span>
-                  <span className="text-gray-900 font-bold">8 créditos</span>
-                </div>
-              </div>
-              
-              <p className="mt-4 text-sm text-gray-600">
-                Te enviaremos los resultados del análisis a la dirección de correo electrónico indicada tan pronto como estén disponibles.
-              </p>
-            </div>
-            
-            {/* Navigation buttons */}
-            <div className="mt-8 flex flex-col sm:flex-row justify-between gap-3">
-              <Button variant="outline" onClick={goToPreviousStep}>
-                Anterior
-              </Button>
-              
-              <div className="flex gap-3">
-                <Button 
-                  variant="outline" 
-                  onClick={() => navigate('/dashboard/servicios')}
-                >
-                  Cancelar
-                </Button>
-                <Button 
-                  onClick={handleSubmit}
-                  disabled={loading}
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Procesando
-                    </>
-                  ) : (
-                    <>
-                      <Check className="mr-2 h-4 w-4" />
-                      Confirmar y procesar
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
