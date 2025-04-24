@@ -24,6 +24,7 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { Mail } from 'lucide-react';
 
 enum SBOMStep {
   FILE_UPLOAD = 1,
