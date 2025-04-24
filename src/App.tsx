@@ -16,6 +16,8 @@ import Credits from "./pages/Credits";
 import Services from "./pages/Services";
 import ServicePayment from "./pages/ServicePayment";
 import PaymentSuccess from "./pages/PaymentSuccess";
+import CVComparator from "./pages/services/CVComparator";
+import SBOMAnalyzer from "./pages/services/SBOMAnalyzer";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +38,8 @@ const App = () => (
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/dashboard/servicios" element={<Services />} />
+                <Route path="/dashboard/servicios/cv-comparator" element={<CVComparator />} />
+                <Route path="/dashboard/servicios/sbom-analyzer" element={<SBOMAnalyzer />} />
                 <Route path="/dashboard/servicios/:serviceId/pagar" element={<ServicePayment />} />
                 <Route path="/dashboard/servicios/success" element={<PaymentSuccess />} />
                 <Route path="/dashboard/historial" element={<div>Historial</div>} />
