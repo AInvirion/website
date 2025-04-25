@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { FileText, Upload, X, Check, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 enum CVComparatorStep {
   PROFILE_DEFINITION = 1,
@@ -26,6 +27,7 @@ interface CVsData {
 }
 
 const CVComparator = () => {
+  const { user } = useAuth();
   const [currentStep, setCurrentStep] = useState<CVComparatorStep>(CVComparatorStep.PROFILE_DEFINITION);
   const [profileData, setProfileData] = useState<ProfileData>({
     method: "file",
