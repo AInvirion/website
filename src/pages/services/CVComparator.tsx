@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { FileText, Upload, X, Check, Loader2, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 
@@ -131,16 +133,51 @@ const CVComparator = () => {
     }
   };
   
-  const handleSubmit = () => {
+  const { data: service } = useQuery({
+    queryKey: ['service', 'cv-comparator'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('name', 'cv-comparator')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleSubmit = async () => {
+    if (!service || !user?.id) return;
+    
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { error: executionError } = await supabase
+        .from('service_executions')
+        .insert({
+          service_id: service.id,
+          user_id: user.id,
+          status: 'pending',
+          credits_used: service.price
+        });
+
+      if (executionError) throw executionError;
+
       toast({
         title: "Análisis iniciado",
         description: "Recibirás los resultados por correo electrónico en los próximos 10 minutos.",
       });
       navigate('/dashboard/servicios');
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Hubo un problema al procesar tu solicitud.",
+        variant: "destructive"
+      });
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
   
   const handleDragOver = (e: React.DragEvent) => {
@@ -466,7 +503,7 @@ const CVComparator = () => {
                     
                     <p className="text-lg font-medium text-gray-900 mb-2">
                       Esto costará aproximadamente: 
-                      <strong className="text-blue-600 ml-1">14 créditos</strong>
+                      <strong className="text-blue-600 ml-1">{service?.price || '...'} créditos</strong>
                     </p>
                     
                     <p className="text-sm text-gray-600">

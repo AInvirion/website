@@ -1,9 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { File, Upload, Check, X, Loader2, ArrowLeft } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { 
@@ -116,16 +117,51 @@ const SBOMAnalyzer = () => {
     });
   };
   
-  const handleSubmit = () => {
+  const { data: service } = useQuery({
+    queryKey: ['service', 'sbom-analyzer'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('services')
+        .select('*')
+        .eq('name', 'sbom-analyzer')
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const handleSubmit = async () => {
+    if (!service || !user?.id) return;
+    
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const { error: executionError } = await supabase
+        .from('service_executions')
+        .insert({
+          service_id: service.id,
+          user_id: user.id,
+          status: 'pending',
+          credits_used: service.price
+        });
+
+      if (executionError) throw executionError;
+
       toast({
         title: "Análisis iniciado",
         description: "Recibirás los resultados por correo electrónico pronto.",
       });
       navigate('/dashboard/servicios');
+    } catch (error) {
+      console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Hubo un problema al procesar tu solicitud.",
+        variant: "destructive"
+      });
+    } finally {
       setLoading(false);
-    }, 1500);
+    }
   };
   
   const handleDragOver = (e: React.DragEvent) => {
@@ -353,7 +389,9 @@ const SBOMAnalyzer = () => {
                       
                       <div className="flex flex-col sm:flex-row justify-between pt-3 border-t">
                         <span className="font-medium text-gray-700">Costo:</span>
-                        <span className="text-gray-900 font-bold">8 créditos</span>
+                        <span className="text-gray-900 font-bold">
+                          {service?.price || '...'} créditos
+                        </span>
                       </div>
                     </div>
                     
