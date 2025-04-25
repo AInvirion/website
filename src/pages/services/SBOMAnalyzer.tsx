@@ -54,6 +54,7 @@ const SBOMAnalyzer = () => {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { initiateServicePayment } = useServicePayment();
   
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
@@ -132,36 +133,15 @@ const SBOMAnalyzer = () => {
   });
 
   const handleSubmit = async () => {
-    if (!service || !user?.id) return;
+    if (!service) return;
     
-    setLoading(true);
-    try {
-      const { error: executionError } = await supabase
-        .from('service_executions')
-        .insert({
-          service_id: service.id,
-          user_id: user.id,
-          status: 'pending',
-          credits_used: service.price
-        });
+    // Store form data in localStorage
+    localStorage.setItem('sbom-analyzer-data', JSON.stringify({
+      sbomData
+    }));
 
-      if (executionError) throw executionError;
-
-      toast({
-        title: "Análisis iniciado",
-        description: "Recibirás los resultados por correo electrónico pronto.",
-      });
-      navigate('/dashboard/servicios');
-    } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: "Error",
-        description: "Hubo un problema al procesar tu solicitud.",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
+    // Initiate payment flow
+    initiateServicePayment(service.id, service.price);
   };
   
   const handleDragOver = (e: React.DragEvent) => {

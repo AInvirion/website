@@ -50,7 +50,10 @@ const ServicePayment = () => {
     if (!hasSufficientCredits) {
       toast("Créditos insuficientes", {
         description: "No tienes suficientes créditos para este servicio",
-        className: "bg-red-500"
+        action: {
+          label: "Comprar créditos",
+          onClick: () => navigate("/dashboard/creditos")
+        }
       });
       return;
     }
@@ -62,7 +65,7 @@ const ServicePayment = () => {
         .from("credit_transactions")
         .insert({
           user_id: user.id,
-          amount: -service.price,
+          amount: service.price,
           type: "service_payment",
           reference_id: service.id,
         });
@@ -75,14 +78,25 @@ const ServicePayment = () => {
           service_id: service.id,
           user_id: user.id,
           credits_used: service.price,
-          status: "completed",
+          status: "pending",
         });
 
       if (executionError) throw executionError;
 
+      if (service.name === 'cv-comparator') {
+        const storedData = localStorage.getItem('cv-comparator-data');
+        if (storedData) {
+          localStorage.removeItem('cv-comparator-data');
+        }
+      } else if (service.name === 'sbom-analyzer') {
+        const storedData = localStorage.getItem('sbom-analyzer-data');
+        if (storedData) {
+          localStorage.removeItem('sbom-analyzer-data');
+        }
+      }
+
       toast("Pago con créditos completado", {
         description: `Has utilizado ${service.price} créditos para este servicio`,
-        className: "bg-green-500"
       });
 
       navigate("/dashboard/historial");
@@ -91,7 +105,6 @@ const ServicePayment = () => {
       console.error("Error al procesar el pago con créditos:", error);
       toast("Error al procesar el pago", {
         description: "Ha ocurrido un problema al procesar el pago con créditos",
-        className: "bg-red-500"
       });
     } finally {
       setIsProcessing(false);
