@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -19,7 +20,7 @@ interface Service {
 const ServicePayment = () => {
   const { serviceId } = useParams<{ serviceId: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, refreshUserData } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<"credits" | "stripe">("credits");
   const [isProcessing, setIsProcessing] = useState(false);
 
@@ -61,28 +62,48 @@ const ServicePayment = () => {
     setIsProcessing(true);
     
     try {
-      const { error: transactionError } = await supabase
+      console.log("Iniciando procesamiento de pago con créditos");
+      console.log("Usuario:", user.id);
+      console.log("Servicio:", service.id);
+      console.log("Precio:", service.price);
+      
+      // 1. Crear transacción de crédito
+      const { data: transactionData, error: transactionError } = await supabase
         .from("credit_transactions")
         .insert({
           user_id: user.id,
           amount: service.price,
           type: "service_payment",
           reference_id: service.id,
-        });
+        })
+        .select();
 
-      if (transactionError) throw transactionError;
+      if (transactionError) {
+        console.error("Error al crear transacción:", transactionError);
+        throw new Error(`Error al crear transacción: ${transactionError.message}`);
+      }
+      
+      console.log("Transacción creada exitosamente:", transactionData);
 
-      const { error: executionError } = await supabase
+      // 2. Crear ejecución del servicio
+      const { data: executionData, error: executionError } = await supabase
         .from("service_executions")
         .insert({
           service_id: service.id,
           user_id: user.id,
           credits_used: service.price,
           status: "pending",
-        });
+        })
+        .select();
 
-      if (executionError) throw executionError;
+      if (executionError) {
+        console.error("Error al registrar ejecución del servicio:", executionError);
+        throw new Error(`Error al registrar ejecución: ${executionError.message}`);
+      }
+      
+      console.log("Ejecución de servicio creada exitosamente:", executionData);
 
+      // 3. Limpiar datos locales si es necesario
       if (service.name === 'cv-comparator') {
         const storedData = localStorage.getItem('cv-comparator-data');
         if (storedData) {
@@ -95,16 +116,21 @@ const ServicePayment = () => {
         }
       }
 
-      toast("Pago con créditos completado", {
+      // 4. Actualizar datos del usuario para reflejar el cambio en créditos
+      await refreshUserData();
+
+      // 5. Mostrar mensaje de éxito
+      toast.success("Pago con créditos completado", {
         description: `Has utilizado ${service.price} créditos para este servicio`,
       });
 
+      // 6. Redirigir al historial
       navigate("/dashboard/historial");
       
     } catch (error) {
       console.error("Error al procesar el pago con créditos:", error);
-      toast("Error al procesar el pago", {
-        description: "Ha ocurrido un problema al procesar el pago con créditos",
+      toast.error("Error al procesar el pago", {
+        description: error instanceof Error ? error.message : "Ha ocurrido un problema al procesar el pago con créditos",
       });
     } finally {
       setIsProcessing(false);
@@ -147,9 +173,8 @@ const ServicePayment = () => {
       }
     } catch (error) {
       console.error("Error al iniciar el proceso de pago:", error);
-      toast("Error al procesar el pago", {
+      toast.error("Error al procesar el pago", {
         description: "Intenta nuevamente más tarde",
-        className: "bg-red-500"
       });
     } finally {
       setIsProcessing(false);

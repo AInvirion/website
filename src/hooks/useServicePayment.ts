@@ -9,11 +9,16 @@ export const useServicePayment = () => {
 
   const initiateServicePayment = (serviceId: string, servicePrice: number) => {
     if (!user) {
+      console.log("No user authenticated, redirecting to auth page");
       navigate("/auth");
       return;
     }
 
+    console.log(`Initiating service payment for service: ${serviceId}`);
+    console.log(`User credits: ${user.credits}, Service price: ${servicePrice}`);
+
     if (!user.credits || user.credits < servicePrice) {
+      console.log("Insufficient credits");
       toast("Créditos insuficientes", {
         description: "No tienes suficientes créditos para este servicio",
         action: {
@@ -24,6 +29,7 @@ export const useServicePayment = () => {
       return;
     }
 
+    console.log("User has sufficient credits, navigating to payment page");
     navigate(`/dashboard/servicios/${serviceId}/pagar`);
   };
 
