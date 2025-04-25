@@ -9,7 +9,7 @@ import { FileText, Upload, X, Check, Loader2, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { useServicePayment } from "@/hooks/use-service-payment";
+import { useServicePayment } from "@/hooks/useServicePayment";
 
 enum CVComparatorStep {
   PROFILE_DEFINITION = 1,
