@@ -18,6 +18,10 @@ import ServicePayment from "./pages/ServicePayment";
 import PaymentSuccess from "./pages/PaymentSuccess";
 import CVComparator from "./pages/services/CVComparator";
 import SBOMAnalyzer from "./pages/services/SBOMAnalyzer";
+import AsistentePersonal from "./pages/services/AsistentePersonal";
+import QuienesSomos from "./pages/QuienesSomos";
+import Historial from "./pages/Historial";
+import Integraciones from "./pages/Integraciones";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +36,7 @@ const App = () => (
             <Route path="/" element={<Index />} />
             <Route path="/auth" element={<Auth />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+            <Route path="/quienes-somos" element={<QuienesSomos />} />
             
             {/* Rutas protegidas - Solo usuarios autenticados */}
             <Route element={<ProtectedRoute />}>
@@ -40,11 +45,13 @@ const App = () => (
                 <Route path="/dashboard/servicios" element={<Services />} />
                 <Route path="/dashboard/servicios/cv-comparator" element={<CVComparator />} />
                 <Route path="/dashboard/servicios/sbom-analyzer" element={<SBOMAnalyzer />} />
+                <Route path="/dashboard/servicios/asistente-personal" element={<AsistentePersonal />} />
                 <Route path="/dashboard/servicios/:serviceId/pagar" element={<ServicePayment />} />
                 <Route path="/dashboard/servicios/success" element={<PaymentSuccess />} />
-                <Route path="/dashboard/historial" element={<div>Historial</div>} />
+                <Route path="/dashboard/historial" element={<Historial />} />
                 <Route path="/dashboard/creditos" element={<Credits />} />
                 <Route path="/dashboard/creditos/success" element={<PaymentSuccess />} />
+                <Route path="/dashboard/integraciones" element={<Integraciones />} />
                 
                 {/* Rutas de administración - Solo administradores */}
                 <Route element={<ProtectedRoute requiredRoles={["admin"]} redirectTo="/unauthorized" />}>

@@ -200,7 +200,7 @@ const SBOMAnalyzer = () => {
   return (
     <div className="flex flex-col min-h-screen">
       <div className="relative bg-blue-600 text-white">
-        <div className="absolute inset-0 bg-[url('/lovable-uploads/3e609b0b-0b53-4606-89ef-af0c2fcc30aa.png')] bg-cover bg-center opacity-20" />
+        <div className="absolute inset-0 bg-[url('/public/placeholder.svg')] bg-cover bg-center opacity-20" />
         <div className="relative container mx-auto px-4 py-16 sm:py-24">
           <Button
             variant="ghost"

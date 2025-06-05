@@ -265,7 +265,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       if (error) throw error;
       setUser(null);
       setIsAuthenticated(false);
-      navigate('/auth');
+      navigate('/');
     } catch (error) {
       console.error('Error signing out:', error);
       alert('Error signing out: ' + error);

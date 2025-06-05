@@ -18,8 +18,15 @@ const Credits = () => {
         {/* Paquetes de créditos */}
         <CreditPackageList />
 
-        {/* Historial de transacciones */}
-        <CreditTransactionHistory userId={user?.id} />
+        {/* Enlace al historial de transacciones */}
+        <div className="md:col-span-2">
+          <a
+            href="/dashboard/historial"
+            className="inline-block mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+          >
+            Ver historial de transacciones
+          </a>
+        </div>
       </div>
     </div>
   );
