@@ -1,0 +1,24 @@
+name: role-based-service-hub
+services:
+- name: web
+  source_dir: /
+  github:
+    repo: TU_USUARIO_GITHUB/role-based-service-hub
+    branch: main
+  build_command: npm run build
+  run_command: npm start
+  environment_slug: node-js
+  instance_count: 1
+  instance_size_slug: basic-xxs
+  http_port: 8080
+  routes:
+  - path: /
+  env:
+  - key: NODE_ENV
+    value: production
+  - key: VITE_SUPABASE_URL
+    value: ${SUPABASE_URL}
+  - key: VITE_SUPABASE_ANON_KEY
+    value: ${SUPABASE_ANON_KEY}
+  - key: VITE_STRIPE_PUBLISHABLE_KEY
+    value: ${STRIPE_PUBLISHABLE_KEY}
